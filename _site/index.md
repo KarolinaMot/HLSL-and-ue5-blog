@@ -763,6 +763,7 @@ void ACustomPass::BeginPlay()
 
 Lastly, you can also set all the variables in the tick function, so you can modify them in the editor as well.
 Now compile and press play!
+
 ![alt text](assets/images/Fog+Aura2.gif "Title")
 
 (For extra effect I also added a very simple fog using the depth stencil ;) )
