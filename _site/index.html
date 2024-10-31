@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,maximum-scale=2">
+    <link rel="stylesheet" href="assets/css/style.css">
+
+<!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Global Illumination with Nvidia's RTXGI | A blog post about my experience integrating global illumination with DX12</title>
+<meta name="generator" content="Jekyll v3.9.3" />
+<meta property="og:title" content="GI-blog-post" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A blog post about my experience integrating global illumination with DX12" />
+<meta property="og:description" content="A blog post about my experience integrating global illumination with DX12" />
+<link rel="canonical" href="http://localhost:4000/Index.html" />
+<meta property="og:url" content="http://localhost:4000/Index.html" />
+<meta property="og:site_name" content="GI-blog-post" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="GI-blog-post" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebPage","description":"A blog post about my experience integrating global illumination with DX12","headline":"GI-blog-post","url":"http://localhost:4000/Index.html"}</script>
+
+
+
+<!-- You can set your favicon here -->
+<!-- link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" -->
+
+<!-- end custom head snippets -->
+
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <img src="assets/images/Buas.png" height="40px">
+          <h1 id="project_title">Creating shaders in UE5 with HLSL</h1>
+          <h2 id="project_tagline">A blog post about creating post processing effects using HLSL in UE5.</h2>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer" >
+      <section id="main_content" class="inner">
+          
+<h2 id="introduction">Introduction</h2>
+
+<p>While the material graph in UE5 is quite complete, sometimes using HLSL is a better alternative. For example, not only are for loops nowhere to be found in the material graph, it can also get tedious and messy very fast as the complexity of a shader increases.</p>
+
+<p>In this post, I will showcase some ways to create shaders using HLSL and explain their pros and cons. Rest assured, none of these will require you to tackle the tedious task of building UE5 from source.</p>
+
+<h2 id="the-custom-node">The custom node</h2>
+
+<p>The simplest and quickest way of creating shaders with HLSL is by using the custom node in the material graph.</p>
+
+<p>Let’s create a very simple edge detection shader using the scene depth buffer. If you have never used a Sobel matrix for this, and you’d like to know how it works, I welcome you to watch <a href="https://www.youtube.com/watch?v=PXLgkxRizPI&amp;t=1158s">this video</a>, which explains it.</p>
+
+<p>First, we start by writing the shader code. This can be done directly in the node’s HLSL input.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">float2</span> <span class="n">pixelSize</span> <span class="o">=</span> <span class="n">LineThickness</span> <span class="o">/</span> <span class="n">ScreenSize</span><span class="p">;</span>
+<span class="n">float2</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span>
+                         <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+                         <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mf">0.5</span><span class="n">f</span><span class="p">)};</span>
+ 
+<span class="n">float2</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">float2</span><span class="p">(</span><span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">);</span>
+
+ <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">i</span><span class="o">&lt;</span><span class="mi">9</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+ <span class="p">{</span>
+     <span class="kt">int</span> <span class="n">row</span> <span class="o">=</span> <span class="n">i</span><span class="o">/</span><span class="mi">3</span><span class="p">;</span>
+     <span class="kt">int</span> <span class="n">col</span> <span class="o">=</span> <span class="n">i</span><span class="o">%</span><span class="mi">3</span><span class="p">;</span>
+
+     <span class="kt">float</span> <span class="n">offsetX</span> <span class="o">=</span> <span class="p">(</span><span class="n">col</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span><span class="n">pixelSize</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+     <span class="kt">float</span> <span class="n">offsetY</span> <span class="o">=</span> <span class="p">(</span><span class="n">row</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span><span class="n">pixelSize</span><span class="p">.</span><span class="n">y</span><span class="p">;</span>
+
+     <span class="n">float2</span> <span class="n">offsetUV</span> <span class="o">=</span> <span class="n">float2</span><span class="p">(</span><span class="n">Uv</span><span class="p">.</span><span class="n">x</span> <span class="o">+</span> <span class="n">offsetX</span><span class="p">,</span> <span class="n">Uv</span><span class="p">.</span><span class="n">y</span> <span class="o">+</span> <span class="n">offsetY</span><span class="p">);</span>
+     
+     <span class="n">float4</span> <span class="n">SceneTexture</span> <span class="o">=</span> <span class="n">SceneTextureLookup</span><span class="p">(</span><span class="n">offsetUV</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+
+     <span class="kt">float</span> <span class="n">depth</span> <span class="o">=</span> <span class="n">saturate</span><span class="p">(</span><span class="n">SceneTexture</span><span class="p">.</span><span class="n">r</span> <span class="o">/</span> <span class="n">DepthPrecision</span><span class="p">);</span>
+      
+     <span class="n">gradients</span><span class="o">+=</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">depth</span><span class="p">;</span>
+ <span class="p">}</span>
+
+ <span class="n">gradients</span> <span class="o">*=</span> <span class="n">LineThickness</span><span class="p">;</span>
+
+ <span class="k">return</span> <span class="nf">length</span><span class="p">(</span><span class="n">gradients</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Let’s look at the  SceneTextureLookup(uv, texIndex,) function. With this function we sample the scene depth texture. The reason why in this case the index is 1 can be seen in the SceneTexture node, in the “Scene Texture Id” field.</p>
+
+<p><img src="Assets/images/SceneTextureIndices.png" alt="alt text" title="Title" /></p>
+
+<p>As it can be seen the node now requires a few inputs – UV, EdgeThickness, ScreenSize, DepthBias and DepthPrecision. This can be added through the node’s details window:</p>
+
+<p><img src="Assets/images/CustomNodeInputs.png" alt="alt text" title="Title" /></p>
+
+<p>We need to add another input, here called Color, to plug in a SceneTexture node. This value does not have to be referenced or used, as it is only needed so we can use the aforementioned function <code class="language-plaintext highlighter-rouge">SceneTextureLookup()</code>.</p>
+
+<p>Next, a thing to note is the return type of the snippet – float. By default, the custom node returns a float4. This can also be changed through the node’s details window.</p>
+
+<p><img src="Assets/images/CustomNodeReturnType.png" alt="alt text" title="Title" /></p>
+
+<p>Once everything is plugged in and the parameters are set, this is the result we get:</p>
+
+<p><img src="Assets/images/CustomNodeBP.png" alt="alt text" title="Title" />
+<img src="Assets/images/Outlines.png" alt="alt text" title="Title" /></p>
+
+<p>//insert result image</p>
+
+<h2 id="using-external-shaders-with-the-custom-node">Using external shaders with the custom node</h2>
+
+<p>If you have experience with the custom node already, you might have noticed that there is an input for include paths.</p>
+
+<p><img src="Assets/images/IncludeFilePaths.png" alt="alt text" title="Title" /></p>
+
+<p>These become really useful once you the shader code becomes too extensive and you would rather use a text editor to deal with it. Unfortunately, UE5 does not expect you to use HLSL code at all, thus using external HLSL files is not as straightforward as it could be.</p>
+
+<h3 id="setup">Setup</h3>
+
+<p>The default path for shaders is the engine folder, which is inconvenient if you’d like to source control your shaders. To fix this, we want to add another shader directory by modifying the primary game module. This will require us to use some C++ and to have Visual Studio installed.</p>
+
+<p>The first step is to create a “Shaders” folder in the root project folder.</p>
+
+<p>Generate a solution file. This can be done through UE5 by right clicking the .uproject file and selecting “Generate Visual Studio Project Files”.</p>
+
+<p>Open the project in Visual Studio.</p>
+
+<p>All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use AddShaderSourceDirectoryMapping() to add an additional shader directory.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="n">PublicDependencyModuleNames</span><span class="p">.</span><span class="n">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="n">string</span><span class="p">[]</span> <span class="p">{</span> <span class="s">"Core"</span><span class="p">,</span> <span class="s">"RenderCore"</span><span class="p">,</span> <span class="s">"CoreUObject"</span><span class="p">,</span> <span class="s">"Engine"</span><span class="p">,</span> <span class="s">"InputCore"</span><span class="p">});</span>
+</code></pre></div></div>
+
+<p>Now in “ProjectName.h” we create a game module class:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//ProjectName.h</span>
+<span class="cp">#include "CoreMinimal.h"
+</span>
+<span class="k">class</span> <span class="nc">FProjectModule</span> <span class="o">:</span> <span class="k">public</span> <span class="n">IModuleInterface</span>
+<span class="p">{</span>
+<span class="nl">public:</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">StartupModule</span><span class="p">()</span> <span class="k">override</span><span class="p">;</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">ShutdownModule</span><span class="p">()</span> <span class="k">override</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>In “ProjectName.cpp” we define the StartupModule() function, and inside we add the secondary directory to the Shaders folder we previously created.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">FString</span> <span class="n">ShaderDirectory</span> <span class="o">=</span> <span class="n">FPaths</span><span class="o">::</span><span class="n">Combine</span><span class="p">(</span><span class="n">FPaths</span><span class="o">::</span><span class="n">ProjectDir</span><span class="p">(),</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"Shaders"</span><span class="p">));</span>
+<span class="n">AddShaderSourceDirectoryMapping</span><span class="p">(</span><span class="s">"/Project"</span><span class="p">,</span> <span class="n">ShaderDirectory</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Finally, we override the primary game module by using the macro <code class="language-plaintext highlighter-rouge">IMPLEMENT_PRIMARY_GAME_MODULE(FProjectModule, ProjectName, "ModuleRulesName");</code></p>
+
+<p>These is the final file:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="c1">// Copyright Epic Games, Inc. All Rights Reserved.</span>
+
+<span class="cp">#include "Prototypes.h"
+#include "Modules/ModuleManager.h"
+#include "Interfaces/IPluginManager.h"
+#include "Logging/LogMacros.h"
+#include "Misc/Paths.h" // include this!
+</span>
+<span class="kt">void</span> <span class="n">FPrototypesModule</span><span class="o">::</span><span class="n">StartupModule</span><span class="p">()</span>
+<span class="p">{</span>
+<span class="n">FString</span> <span class="n">ShaderDirectory</span> <span class="o">=</span> <span class="n">FPaths</span><span class="o">::</span><span class="n">Combine</span><span class="p">(</span><span class="n">FPaths</span><span class="o">::</span><span class="n">ProjectDir</span><span class="p">(),</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"Shaders"</span><span class="p">));</span>
+<span class="n">AddShaderSourceDirectoryMapping</span><span class="p">(</span><span class="s">"/Project"</span><span class="p">,</span> <span class="n">ShaderDirectory</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="kt">void</span> <span class="n">FPrototypesModule</span><span class="o">::</span><span class="n">ShutdownModule</span><span class="p">(){}</span>
+
+<span class="n">IMPLEMENT_PRIMARY_GAME_MODULE</span><span class="p">(</span><span class="n">FPrototypesModule</span><span class="p">,</span> <span class="n">Prototypes</span><span class="p">,</span> <span class="s">"Prototypes"</span><span class="p">);</span>
+
+</code></pre></div></div>
+
+<p>Once this is all done, you can press F5 to launch UE5.</p>
+
+<h3 id="using-it">Using it</h3>
+
+<p>To complicate the previous shader, let’s say we want to apply a noise texture along the edges of the objects.</p>
+
+<p>Shaders in UE5 have to be created with the .ush or .usf extensions, so let’s create a new file in the “Shaders” folder we created and call it “EdgeDetection.ush”.</p>
+
+<p>Here we can paste this code:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="nc">DetectEdges</span>
+<span class="p">{</span>
+    <span class="n">float3</span> <span class="n">GetNormal</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">)</span>
+    <span class="p">{</span>
+
+        <span class="n">float4</span> <span class="n">SceneTexture</span> <span class="o">=</span> <span class="n">SceneTextureLookup</span><span class="p">(</span><span class="n">uv</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">SceneTexture</span><span class="p">.</span><span class="n">rgb</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kt">float</span> <span class="n">GetDepth</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthPrecision</span><span class="p">)</span>
+    <span class="p">{</span>
+
+        <span class="n">float4</span> <span class="n">SceneTexture</span> <span class="o">=</span> <span class="n">SceneTextureLookup</span><span class="p">(</span><span class="n">uv</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">saturate</span><span class="p">(</span><span class="n">SceneTexture</span><span class="p">.</span><span class="n">r</span> <span class="o">/</span> <span class="n">depthPrecision</span><span class="p">);</span>
+    <span class="p">}</span>
+
+    <span class="n">float3</span> <span class="n">GetColor</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">)</span>
+    <span class="p">{</span>
+
+        <span class="n">float4</span> <span class="n">SceneTexture</span> <span class="o">=</span> <span class="n">SceneTextureLookup</span><span class="p">(</span><span class="n">uv</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">false</span><span class="p">);</span>
+
+        <span class="k">return</span> <span class="n">SceneTexture</span><span class="p">.</span><span class="n">rgb</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="kt">float</span> <span class="n">IsEdge</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">,</span> <span class="n">float3</span> <span class="n">color</span><span class="p">,</span> <span class="kt">float</span> <span class="n">EdgeThickness</span><span class="p">,</span> <span class="n">float2</span> <span class="n">screenSize</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthBias</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthPrecision</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">float2</span> <span class="n">pixelSize</span> <span class="o">=</span> <span class="n">EdgeThickness</span> <span class="o">/</span> <span class="n">screenSize</span><span class="p">;</span>
+        <span class="n">float2</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span>
+                                <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span>
+                                <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mf">0.5</span><span class="n">f</span><span class="p">)};</span>
+        
+        <span class="n">float2</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">float2</span><span class="p">(</span><span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">);</span>
+
+        <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">i</span><span class="o">&lt;</span><span class="mi">9</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="kt">int</span> <span class="n">row</span> <span class="o">=</span> <span class="n">i</span><span class="o">/</span><span class="mi">3</span><span class="p">;</span>
+            <span class="kt">int</span> <span class="n">col</span> <span class="o">=</span> <span class="n">i</span><span class="o">%</span><span class="mi">3</span><span class="p">;</span>
+
+            <span class="kt">float</span> <span class="n">offsetX</span> <span class="o">=</span> <span class="p">(</span><span class="n">col</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span><span class="n">pixelSize</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+            <span class="kt">float</span> <span class="n">offsetY</span> <span class="o">=</span> <span class="p">(</span><span class="n">row</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span><span class="n">pixelSize</span><span class="p">.</span><span class="n">y</span><span class="p">;</span>
+
+            <span class="n">float2</span> <span class="n">offsetUV</span> <span class="o">=</span> <span class="n">float2</span><span class="p">(</span><span class="n">uv</span><span class="p">.</span><span class="n">x</span> <span class="o">+</span> <span class="n">offsetX</span><span class="p">,</span> <span class="n">uv</span><span class="p">.</span><span class="n">y</span> <span class="o">+</span> <span class="n">offsetY</span><span class="p">);</span>
+            
+            <span class="kt">float</span> <span class="n">depth</span> <span class="o">=</span> <span class="n">GetDepth</span><span class="p">(</span><span class="n">offsetUV</span><span class="p">,</span> <span class="n">depthPrecision</span><span class="p">);</span>
+            <span class="n">gradients</span><span class="o">+=</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">depth</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="n">gradients</span> <span class="o">*=</span> <span class="n">EdgeThickness</span><span class="p">;</span>
+
+        <span class="k">return</span> <span class="n">length</span><span class="p">(</span><span class="n">gradients</span><span class="p">);</span>
+    <span class="p">}</span>
+    
+    <span class="n">float3</span> <span class="n">DetectEdge</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">,</span> <span class="n">float3</span> <span class="n">color</span><span class="p">,</span> <span class="kt">float</span> <span class="n">EdgeThickness</span><span class="p">,</span> <span class="n">float2</span> <span class="n">screenSize</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthBias</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthPrecision</span><span class="p">,</span> <span class="n">float3</span> <span class="n">noise</span><span class="p">,</span> <span class="kt">float</span> <span class="n">noiseStrength</span><span class="p">,</span> <span class="n">float3</span> <span class="n">tendrilColor</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">DebugLines</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">float2</span> <span class="n">pixelSize</span> <span class="o">=</span> <span class="n">EdgeThickness</span> <span class="o">/</span> <span class="n">screenSize</span><span class="p">;</span>
+        <span class="kt">float</span> <span class="n">edge</span> <span class="o">=</span> <span class="n">IsEdge</span><span class="p">(</span><span class="n">uv</span><span class="p">,</span> <span class="n">color</span><span class="p">,</span> <span class="n">EdgeThickness</span><span class="p">,</span> <span class="n">screenSize</span><span class="p">,</span> <span class="n">depthBias</span><span class="p">,</span> <span class="n">depthPrecision</span><span class="p">);</span>
+        <span class="n">float3</span> <span class="n">sceneColor</span> <span class="o">=</span>  <span class="n">GetColor</span><span class="p">(</span><span class="n">uv</span><span class="p">);</span>
+        <span class="n">edge</span> <span class="o">=</span> <span class="n">clamp</span><span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">1.</span><span class="n">f</span><span class="p">);</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="n">DebugLines</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="k">return</span> <span class="n">tendrilColor</span> <span class="o">*</span> <span class="n">edge</span> <span class="o">&gt;</span> <span class="n">depthBias</span> <span class="o">?</span> <span class="n">tendrilColor</span> <span class="o">*</span> <span class="n">edge</span> <span class="o">:</span> <span class="n">float3</span><span class="p">(</span><span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">);</span>
+        <span class="p">}</span>
+
+        <span class="n">float3</span> <span class="n">result</span> <span class="o">=</span> <span class="n">sceneColor</span> <span class="o">+</span> <span class="n">tendrilColor</span> <span class="o">*</span> <span class="n">noise</span> <span class="o">*</span> <span class="n">noiseStrength</span> <span class="o">*</span> <span class="n">edge</span><span class="p">;</span>
+        <span class="k">return</span> <span class="n">edge</span> <span class="o">&gt;</span> <span class="n">depthBias</span> <span class="o">?</span> <span class="n">result</span> <span class="o">:</span> <span class="n">sceneColor</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>The way the custom node works, is that it inserts your code in the generated shader in a function called <code class="language-plaintext highlighter-rouge">MaterialFloat3 CustomExpression0()</code>. You can check this by going to Window-&gt;ShaderCode-&gt;HLSL Code. For this reason, when you want to encapsulate something in a function, you must do so by using structs.</p>
+
+<p>Now to finally to use this shader, you plug everything in, you add the include path to the right slot, in this case “/Project/EdgeDetection.ush” and call the function in the node like this:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">DetectEdges</span> <span class="n">detect</span><span class="p">;</span>
+<span class="k">return</span> <span class="n">detect</span><span class="p">.</span><span class="n">DetectEdge</span><span class="p">(</span><span class="n">Uv</span><span class="p">,</span> <span class="n">Color</span><span class="p">,</span> <span class="n">LineThickness</span><span class="p">,</span> <span class="n">ScreenSize</span><span class="p">,</span> <span class="n">DepthBias</span><span class="p">,</span> <span class="n">DepthPrecision</span><span class="p">,</span> <span class="n">Noise</span><span class="p">,</span> <span class="n">NoiseStrength</span><span class="p">,</span> <span class="n">TendrilColor</span><span class="p">,</span> <span class="n">DebugLines</span><span class="p">);</span>
+</code></pre></div></div>
+<p>This is the final result!
+<img src="Assets/images/Aura.gif" alt="alt text" title="Title" /></p>
+
+<h2 id="global-shaders-and-sceneviewextension">Global Shaders and SceneViewExtension</h2>
+
+<p>Disclaimer: this method requires you to have some decent knowledge in C++ and graphics programming.</p>
+
+<p>The previous ways are fine, but for more complex shaders that require multiple passes you might want to take a look into SceneViewExtensions. What this class does is it lets you “inject” custom render passes into UE5 without having to modify the engine’s source code. Meanwhile, Global Shaders, according to UE5’s documentation, are “shaders that are not created using the Material Editor. Instead, they are created using C++, operate on fixed geometry and do not need to interface with materials or a mesh.” For this reason, Global shaders are perfect for post processing effects. You could also use PostProcessingShaders, but those are still tied to the post processing pipeline, which means you’d need to modify the source code. If you want to read more on the type of shaders unreal uses, I recommend this <a href="https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html">blog post</a>.</p>
+
+<h3 id="the-game-module">The game module</h3>
+
+<p>For starters, we need to create a custom game module, separate from the primary one.  This is because shaders need to be compiled at a certain point, and by the time the primary game module is initialized – it is too late.</p>
+
+<p>Assuming you already have your C++ project set up, you can do this by  first going to ProjectName/Source, creating a new folder in that directory, and naming it as you’d name the new module. In this post, I will call it “AuraShaderModule”, as that is what I will be implementing.</p>
+
+<p>Next you create 3 more folders in the new one: Public, Private and Shaders. After this, some files need to be created.</p>
+
+<p>In the root module folder:</p>
+
+<ul>
+  <li>AuraShaderModule.build.cs</li>
+</ul>
+
+<p>In Public:</p>
+
+<ul>
+  <li>AuraShaderModule.h</li>
+  <li>CustomViewExtension.h</li>
+  <li>OutlineShader.h</li>
+</ul>
+
+<p>In Private:</p>
+
+<ul>
+  <li>AuraShaderModule.cpp</li>
+  <li>CustomViewExtension.cpp</li>
+  <li>OutlineShader.cpp</li>
+</ul>
+
+<p>Once that is done, we can start writing our module class.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//Public/AuraShaderModule.h</span>
+<span class="cp">#pragma once
+#include "CoreMinimal.h"
+#include "Modules/ModuleManager.h"
+</span>
+<span class="k">class</span> <span class="nc">FAuraShaderModule</span><span class="o">:</span> <span class="k">public</span> <span class="n">IModuleInterface</span> <span class="p">{</span>
+<span class="nl">public:</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">StartupModule</span><span class="p">()</span> <span class="k">override</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//Private/AuraShaderModule.cpp</span>
+<span class="cp">#include "CustomModule.h"
+</span>
+<span class="kt">void</span> <span class="n">FAuraShaderModule</span><span class="o">::</span><span class="n">StartupModule</span><span class="p">()</span> <span class="p">{</span>
+<span class="n">FString</span> <span class="n">BaseDir</span> <span class="o">=</span> <span class="n">FPaths</span><span class="o">::</span><span class="n">Combine</span><span class="p">(</span><span class="n">FPaths</span><span class="o">::</span><span class="n">GameSourceDir</span><span class="p">(),</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"AuraShaderModule"</span><span class="p">));</span>
+<span class="n">FString</span> <span class="n">ModuleShaderDir</span> <span class="o">=</span> <span class="n">FPaths</span><span class="o">::</span><span class="n">Combine</span><span class="p">(</span><span class="n">BaseDir</span><span class="p">,</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"Shaders"</span><span class="p">));</span>
+<span class="n">AddShaderSourceDirectoryMapping</span><span class="p">(</span><span class="n">TEXT</span><span class="p">(</span><span class="s">"/AuraShaderModule"</span><span class="p">),</span> <span class="n">ModuleShaderDir</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">IMPLEMENT_MODULE</span><span class="p">(</span><span class="n">FAuraShaderModule</span><span class="p">,</span> <span class="n">AuraShaderModule</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Here we use <code class="language-plaintext highlighter-rouge">AddShaderSourceDirectoryMapping</code> again to add a shader directory to the Shader folder we created inside the module folder. Then we use the macro <code class="language-plaintext highlighter-rouge">IMPLEMENT_MODULE</code> to implement it, adding the name of the class and also the build file, which we will write next.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// AuraShaderModule.build.cs</span>
+<span class="k">using</span> <span class="n">UnrealBuildTool</span><span class="p">;</span>
+<span class="k">using</span> <span class="n">System</span><span class="p">.</span><span class="n">Collections</span><span class="p">.</span><span class="n">Generic</span><span class="p">;</span>
+<span class="k">using</span> <span class="n">System</span><span class="p">.</span><span class="n">IO</span><span class="p">;</span>
+<span class="k">public</span> <span class="k">class</span> <span class="nc">AuraShaderModule</span> <span class="o">:</span> <span class="n">ModuleRules</span>
+<span class="p">{</span>
+    <span class="k">public</span> <span class="n">AuraShaderModule</span> <span class="p">(</span><span class="n">ReadOnlyTargetRules</span> <span class="n">Target</span><span class="p">)</span> <span class="o">:</span> <span class="n">base</span><span class="p">(</span><span class="n">Target</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">PCHUsage</span> <span class="o">=</span> <span class="n">PCHUsageMode</span><span class="p">.</span><span class="n">UseExplicitOrSharedPCHs</span><span class="p">;</span>
+
+        <span class="n">PublicDependencyModuleNames</span><span class="p">.</span><span class="n">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="n">string</span><span class="p">[]</span> <span class="p">{</span> <span class="s">"Core"</span><span class="p">,</span> <span class="s">"CoreUObject"</span><span class="p">,</span> <span class="s">"Engine"</span><span class="p">,</span> <span class="s">"Renderer"</span><span class="p">,</span> <span class="s">"RenderCore"</span><span class="p">,</span> <span class="s">"RHI"</span> <span class="p">});</span>
+        <span class="n">string</span> <span class="n">EnginePath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">.</span><span class="n">GetFullPath</span><span class="p">(</span><span class="n">Target</span><span class="p">.</span><span class="n">RelativeEnginePath</span><span class="p">);</span>
+        <span class="n">PublicIncludePaths</span><span class="p">.</span><span class="n">Add</span><span class="p">(</span><span class="n">EnginePath</span> <span class="o">+</span> <span class="s">"Source/Runtime/Renderer/Private"</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Here we define the public dependencies of the module as in previous examples. We also add <code class="language-plaintext highlighter-rouge">Source/Runtime/Renderer/Private</code> to the include paths, as we will be referencing some private classes.</p>
+
+<p>Finally, we need to actually add the module to the project. For starters let’s add our custom module to the <code class="language-plaintext highlighter-rouge">PublicDependencyModuleNames</code> of our primary module. This can be found under  <code class="language-plaintext highlighter-rouge">Source/ProjectName/AuraShaderModule.Build.cs</code>.</p>
+
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//AuraShaderModule.Build.cs</span>
+<span class="c1">// Copyright Epic Games, Inc. All Rights Reserved.</span>
+<span class="k">using</span> <span class="nn">UnrealBuildTool</span><span class="p">;</span>
+
+<span class="k">public</span> <span class="k">class</span> <span class="nc">Prototypes</span> <span class="p">:</span> <span class="n">ModuleRules</span>
+<span class="p">{</span>
+<span class="k">public</span> <span class="nf">Prototypes</span><span class="p">(</span><span class="n">ReadOnlyTargetRules</span> <span class="n">Target</span><span class="p">)</span> <span class="p">:</span> <span class="k">base</span><span class="p">(</span><span class="n">Target</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">PCHUsage</span> <span class="p">=</span> <span class="n">PCHUsageMode</span><span class="p">.</span><span class="n">UseExplicitOrSharedPCHs</span><span class="p">;</span>
+
+    <span class="n">PublicDependencyModuleNames</span><span class="p">.</span><span class="nf">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="kt">string</span><span class="p">[]</span> <span class="p">{</span> <span class="s">"Core"</span><span class="p">,</span> <span class="s">"RenderCore"</span><span class="p">,</span> <span class="s">"CoreUObject"</span><span class="p">,</span> <span class="s">"Engine"</span><span class="p">,</span> <span class="s">"InputCore"</span><span class="p">,</span> <span class="s">"AuraShaderModule"</span> <span class="p">});</span>
+
+    <span class="n">PrivateDependencyModuleNames</span><span class="p">.</span><span class="nf">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="kt">string</span><span class="p">[]</span> <span class="p">{</span>  <span class="p">});</span>
+    <span class="n">PublicIncludePaths</span><span class="p">.</span><span class="nf">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="kt">string</span><span class="p">[]</span> <span class="p">{</span> <span class="s">"D:\\GITHUB\\Prototypes"</span> <span class="p">});</span>
+<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Finally, we just have to add the module to the .uproject file. It is very important we set <code class="language-plaintext highlighter-rouge">LoadingPhase</code> as <code class="language-plaintext highlighter-rouge">PostConfigInit</code> so our shaders get compiled. So just open the .uproject file as a text file and make sure it looks something like this:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s">"Modules"</span><span class="o">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+        <span class="s">"Name"</span><span class="o">:</span> <span class="s">"Prototypes"</span><span class="p">,</span>
+        <span class="s">"Type"</span><span class="o">:</span> <span class="s">"Runtime"</span><span class="p">,</span>
+        <span class="s">"LoadingPhase"</span><span class="o">:</span> <span class="s">"Default"</span><span class="p">,</span>
+        <span class="s">"AdditionalDependencies"</span><span class="o">:</span> <span class="p">[</span>
+            <span class="s">"Engine"</span>
+        <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+        <span class="s">"Name"</span><span class="o">:</span> <span class="s">"AuraShaderModule"</span><span class="p">,</span>
+        <span class="s">"Type"</span><span class="o">:</span> <span class="s">"Runtime"</span><span class="p">,</span>
+        <span class="s">"LoadingPhase"</span><span class="o">:</span> <span class="s">"PostConfigInit"</span>
+    <span class="p">}</span>
+<span class="p">],</span>
+</code></pre></div></div>
+
+<p>Once this is all done, you can right click the .uproject file and click on <code class="language-plaintext highlighter-rouge">Generate Visual Studio Project Files</code>. At this point you can run Unreal through visual studio to make sure everything runs properly.</p>
+
+<h3 id="defining-and-implementing-a-global-shader">Defining and implementing a Global Shader</h3>
+
+<p>Now let’s get to the fun part - defining a global shader. Let’s start with <code class="language-plaintext highlighter-rouge">AuraShaderModule/Private/OutlineShader.h</code> and define the input structure for our shaders. These are the same ones as we used in the custom node chapter.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">BEGIN_SHADER_PARAMETER_STRUCT</span><span class="p">(</span><span class="n">FOutlineShaderParameters</span><span class="p">,</span> <span class="p">)</span>
+<span class="n">SHADER_PARAMETER_SAMPLER</span><span class="p">(</span><span class="n">SamplerState</span><span class="p">,</span> <span class="n">InputSampler</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER_RDG_TEXTURE</span><span class="p">(</span><span class="n">Texture2D</span><span class="p">,</span> <span class="n">SceneColor</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER_RDG_TEXTURE</span><span class="p">(</span><span class="n">Texture2D</span><span class="p">,</span> <span class="n">SceneDepth</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER_RDG_TEXTURE</span><span class="p">(</span><span class="n">Texture2D</span><span class="p">,</span> <span class="n">Noise</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="n">FLinearColor</span><span class="p">,</span> <span class="n">LineColor</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">EdgeThickness</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">EdgeIntensity</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">DepthBias</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">Time</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">MovementSpeed</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">NoiseSize</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER</span><span class="p">(</span><span class="kt">float</span><span class="p">,</span> <span class="n">NoiseStrength</span><span class="p">)</span>
+<span class="n">SHADER_PARAMETER_STRUCT</span><span class="p">(</span><span class="n">FScreenPassTextureViewportParameters</span><span class="p">,</span> <span class="n">ViewParams</span><span class="p">)</span>
+<span class="n">RENDER_TARGET_BINDING_SLOTS</span><span class="p">()</span>
+<span class="n">END_SHADER_PARAMETER_STRUCT</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>These Unreal macros might seem scary, but once you read into it you’ll realize all it does is define a structure using macros.</p>
+
+<p>Next let’s define the shader class.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//AuraShaderModule/Public/OutlineShader.h</span>
+<span class="k">class</span> <span class="nc">FOutlineShaderPS</span> <span class="o">:</span> <span class="k">public</span> <span class="n">FGlobalShader</span> <span class="p">{</span>
+<span class="nl">public:</span>
+<span class="n">DECLARE_EXPORTED_SHADER_TYPE</span><span class="p">(</span><span class="n">FOutlineShaderPS</span><span class="p">,</span> <span class="n">Global</span><span class="p">,);</span>
+<span class="k">using</span> <span class="n">FParameters</span> <span class="o">=</span> <span class="n">FOutlineShaderParameters</span><span class="p">;</span>
+<span class="n">SHADER_USE_PARAMETER_STRUCT</span><span class="p">(</span><span class="n">FOutlineShaderPS</span><span class="p">,</span> <span class="n">FGlobalShader</span><span class="p">);</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>First we declare the shader with <code class="language-plaintext highlighter-rouge">DECLARE_EXPORTED_SHADER_TYPE</code> and then we use an alias for <code class="language-plaintext highlighter-rouge">FOutlineShaderParameters</code> so the next macro, <code class="language-plaintext highlighter-rouge">SHADER_USE_PARAMETER_STRUCT</code> binds the struct to this shader.</p>
+
+<p>Finally in the .cpp file, we implement the shader.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//AuraShaderModule/Private/OutlineShader.cpp</span>
+
+<span class="cp">#include "OutlineShader.h"
+</span>
+<span class="n">IMPLEMENT_SHADER_TYPE</span><span class="p">(,</span> <span class="n">FAuraShaderPS</span><span class="p">,</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"/AuraShaderModule/Aura.usf"</span><span class="p">),</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"AuraMainPS"</span><span class="p">),</span> <span class="n">SF_Pixel</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Also, don’t forget do add the outline shader we wrote before to the module’s shader directory. It should generally look the same, with some exceptions:</p>
+
+<ol>
+  <li>We are using a sampler instead of using <code class="language-plaintext highlighter-rouge">SceneTextureLookup</code></li>
+  <li>We need to add some ue5 shader includes</li>
+  <li>We need to define <code class="language-plaintext highlighter-rouge">SCREEN_PASS_TEXTURE_VIEWPORT(ViewParams)</code> so we can get variables like the screen’s size.</li>
+  <li>We need to define the inputs.</li>
+  <li>We need a new function to calculate the UV <code class="language-plaintext highlighter-rouge">float2 PosToUV(float2 Pos)</code></li>
+</ol>
+
+<p>In the end it should look something like this</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//AuraShaderModule/Shaders/Aura.usf</span>
+
+<span class="cp">#include "/Engine/Public/Platform.ush"
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+</span>
+<span class="n">SCREEN_PASS_TEXTURE_VIEWPORT</span><span class="p">(</span><span class="n">ViewParams</span><span class="p">)</span>
+
+<span class="n">SamplerState</span> <span class="n">InputSampler</span><span class="p">;</span>
+<span class="n">Texture2D</span> <span class="n">SceneColor</span><span class="p">;</span>
+<span class="n">Texture2D</span> <span class="n">SceneDepth</span><span class="p">;</span>
+<span class="n">Texture2D</span> <span class="n">Noise</span><span class="p">;</span>
+<span class="n">float4</span> <span class="n">LineColor</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">EdgeThickness</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">EdgeIntensity</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">DepthBias</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">NoiseSize</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">NoiseStrength</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">Time</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">MovementSpeed</span><span class="p">;</span>
+<span class="n">uint</span> <span class="n">DebugLines</span><span class="p">;</span>
+
+<span class="n">float2</span> <span class="nf">PosToUV</span><span class="p">(</span><span class="n">float2</span> <span class="n">Pos</span><span class="p">);</span>
+<span class="kt">float</span> <span class="nf">Edge</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">);</span>
+<span class="n">float2</span> <span class="nf">GetMovementDirection</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">);</span>
+
+<span class="n">float4</span> <span class="n">AuraMainPS</span><span class="p">(</span><span class="n">float4</span> <span class="n">SvPosition</span> <span class="o">:</span> <span class="n">SV_POSITION</span><span class="p">)</span> <span class="o">:</span> <span class="n">SV_Target0</span>
+<span class="p">{</span>
+    <span class="c1">// Convert screen position to UV coordinates for sampling</span>
+    <span class="n">float2</span> <span class="n">ScreenUV</span> <span class="o">=</span> <span class="n">PosToUV</span><span class="p">(</span><span class="n">SvPosition</span><span class="p">).</span><span class="n">xy</span><span class="p">;</span>
+
+    <span class="c1">// Calculate edge intensity</span>
+    <span class="kt">float</span> <span class="n">edge</span> <span class="o">=</span> <span class="n">saturate</span><span class="p">(</span><span class="n">Edge</span><span class="p">(</span><span class="n">ScreenUV</span><span class="p">));</span>
+
+    <span class="c1">// Sample the base scene color at ScreenUV</span>
+    <span class="n">float4</span> <span class="n">sceneColor</span> <span class="o">=</span> <span class="n">SceneColor</span><span class="p">.</span><span class="n">SampleLevel</span><span class="p">(</span><span class="n">InputSampler</span><span class="p">,</span> <span class="n">ScreenUV</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="c1">// Calculate animated noise offset for dynamic effect</span>
+    <span class="n">float2</span> <span class="n">noiseMovementVelocity</span> <span class="o">=</span> <span class="n">GetMovementDirection</span><span class="p">(</span><span class="n">ScreenUV</span><span class="p">)</span> <span class="o">*</span> <span class="n">MovementSpeed</span> <span class="o">*</span> <span class="n">Time</span><span class="p">;</span>
+    <span class="kt">float</span> <span class="n">noise</span> <span class="o">=</span> <span class="n">Noise</span><span class="p">.</span><span class="n">SampleLevel</span><span class="p">(</span><span class="n">InputSampler</span><span class="p">,</span> <span class="n">ScreenUV</span> <span class="o">*</span> <span class="n">NoiseSize</span> <span class="o">+</span> <span class="n">noiseMovementVelocity</span><span class="p">,</span> <span class="mi">0</span><span class="p">).</span><span class="n">r</span><span class="p">;</span>
+
+    <span class="c1">// Debug mode to visualize edges</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">DebugLines</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="n">DepthBias</span> <span class="o">?</span> <span class="n">edge</span> <span class="o">*</span> <span class="n">LineColor</span> <span class="o">:</span> <span class="n">float4</span><span class="p">(</span><span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">1.</span><span class="n">f</span><span class="p">);</span>
+
+    <span class="c1">// Calculate edge color with noise modulation</span>
+    <span class="n">float3</span> <span class="n">edgeColor</span> <span class="o">=</span> <span class="n">LineColor</span><span class="p">.</span><span class="n">rgb</span> <span class="o">*</span> <span class="n">noise</span> <span class="o">*</span> <span class="n">NoiseStrength</span> <span class="o">*</span> <span class="n">edge</span><span class="p">;</span>
+
+    <span class="c1">// Final aura result combining edge color</span>
+    <span class="n">float3</span> <span class="n">auraResult</span> <span class="o">=</span> <span class="n">edge</span> <span class="o">&gt;=</span> <span class="n">DepthBias</span> <span class="o">?</span> <span class="n">edgeColor</span> <span class="o">+</span> <span class="n">sceneColor</span><span class="p">.</span><span class="n">rgb</span> <span class="o">:</span> <span class="n">sceneColor</span><span class="p">.</span><span class="n">rgb</span><span class="p">;</span>
+
+    <span class="k">return</span> <span class="n">float4</span><span class="p">(</span><span class="n">auraResult</span><span class="p">,</span> <span class="mf">1.</span><span class="n">f</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">float2</span> <span class="nf">PosToUV</span><span class="p">(</span><span class="n">float2</span> <span class="n">Pos</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">float2</span> <span class="n">ViewportUV</span> <span class="o">=</span> <span class="p">((</span><span class="n">Pos</span> <span class="o">-</span> <span class="n">ViewParams_ViewportMin</span><span class="p">.</span><span class="n">xy</span><span class="p">)</span> <span class="o">*</span> <span class="n">ViewParams_ViewportSizeInverse</span><span class="p">.</span><span class="n">xy</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">ViewportUV</span> <span class="o">*</span> <span class="n">ViewParams_UVViewportSize</span> <span class="o">+</span> <span class="n">ViewParams_UVViewportMin</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Set direction based on position in the screen space</span>
+<span class="n">float2</span> <span class="nf">GetMovementDirection</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="n">float2</span><span class="p">(</span><span class="n">uv</span><span class="p">.</span><span class="n">x</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="n">f</span> <span class="o">?</span> <span class="mf">1.</span><span class="n">f</span> <span class="o">:</span> <span class="o">-</span><span class="mf">1.</span><span class="n">f</span><span class="p">,</span> <span class="n">uv</span><span class="p">.</span><span class="n">y</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="n">f</span> <span class="o">?</span> <span class="mf">1.</span><span class="n">f</span> <span class="o">:</span> <span class="o">-</span><span class="mf">1.</span><span class="n">f</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">float</span> <span class="nf">Edge</span><span class="p">(</span><span class="n">float2</span> <span class="n">uv</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// Set pixel size for edge detection based on viewport size and edge thickness</span>
+    <span class="n">float2</span> <span class="n">pixelSize</span> <span class="o">=</span> <span class="n">EdgeThickness</span> <span class="o">/</span> <span class="n">ViewParams_ViewportSize</span><span class="p">;</span>
+
+    <span class="c1">// Define 3x3 matrix for Sobel edge detection</span>
+    <span class="n">float2</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span>
+    <span class="p">{</span>
+        <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">),</span>
+        <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">float2</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="n">f</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">float2</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.5</span><span class="n">f</span><span class="p">)</span>
+    <span class="p">};</span>
+
+    <span class="c1">// Calculate depth gradients using the Sobel matrix for edge intensity</span>
+    <span class="n">float2</span> <span class="n">gradients</span> <span class="o">=</span> <span class="n">float2</span><span class="p">(</span><span class="mf">0.</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.</span><span class="n">f</span><span class="p">);</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">9</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="c1">// Calculate offset UV once per pixel</span>
+        <span class="n">float2</span> <span class="n">offsetUV</span> <span class="o">=</span> <span class="n">uv</span> <span class="o">+</span> <span class="n">float2</span><span class="p">((</span><span class="n">i</span> <span class="o">%</span> <span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">pixelSize</span><span class="p">.</span><span class="n">x</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">pixelSize</span><span class="p">.</span><span class="n">y</span><span class="p">);</span>
+        <span class="c1">// Depth sample per matrix entry</span>
+        <span class="n">gradients</span> <span class="o">+=</span> <span class="n">sobelMatrix</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">SceneDepth</span><span class="p">.</span><span class="n">SampleLevel</span><span class="p">(</span><span class="n">InputSampler</span><span class="p">,</span> <span class="n">offsetUV</span><span class="p">,</span> <span class="mi">0</span><span class="p">).</span><span class="n">r</span><span class="p">;</span> 
+    <span class="p">}</span>
+
+    <span class="c1">// Apply edge intensity and return the length of the gradient vector for edge strength</span>
+    <span class="k">return</span> <span class="n">length</span><span class="p">(</span><span class="n">gradients</span> <span class="o">*</span> <span class="n">EdgeIntensity</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Once you have all of this, launch UE5 from visual studio to make sure everything compiles.</p>
+
+<h3 id="scene-view-extensions">Scene view extensions</h3>
+
+<p>As I mentioned, the <code class="language-plaintext highlighter-rouge">scene view extension</code> class is what’s responsible for injecting the render pass in the engine. If you look at this base class, you can see all the functions you can use for this</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//SceneViewExtension.h</span>
+<span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span>
+<span class="cm">/**
+ * Called on game thread when creating the view.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">SetupView</span><span class="p">(</span><span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="cm">/**
+* Called when creating the viewpoint, before culling, in case an external tracking device needs to modify the base location of the view
+*/</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">SetupViewPoint</span><span class="p">(</span><span class="n">APlayerController</span><span class="o">*</span> <span class="n">Player</span><span class="p">,</span> <span class="n">FMinimalViewInfo</span><span class="o">&amp;</span> <span class="n">InViewInfo</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called when creating the view, in case non-stereo devices need to update projection matrix.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">SetupViewProjectionMatrix</span><span class="p">(</span><span class="n">FSceneViewProjectionData</span><span class="o">&amp;</span> <span class="n">InOutProjectionData</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called on game thread when view family is about to be rendered.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">BeginRenderViewFamily</span><span class="p">(</span><span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+<span class="cm">/**
+ * Called on render thread at the start of rendering.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PreRenderViewFamily_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called on render thread at the start of rendering, for each view, after PreRenderViewFamily_RenderThread call.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PreRenderView_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called on render thread prior to initializing views.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PreInitViews_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called on render thread right before Base Pass rendering. bDepthBufferIsPopulated is true if anything has been rendered to the depth buffer. This does not need to be a full depth prepass.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PreRenderBasePass_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">bDepthBufferIsPopulated</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called right after Base Pass rendering finished when using the deferred renderer.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PostRenderBasePassDeferred_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">,</span> <span class="k">const</span> <span class="n">FRenderTargetBindingSlots</span><span class="o">&amp;</span> <span class="n">RenderTargets</span><span class="p">,</span> <span class="n">TRDGUniformBufferRef</span><span class="o">&lt;</span><span class="n">FSceneTextureUniformParameters</span><span class="o">&gt;</span> <span class="n">SceneTextures</span><span class="p">)</span> <span class="p">{}</span>
+
+<span class="cm">/**
+ * Called right after Base Pass rendering finished when using the mobile renderer.
+ */</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="nf">PostRenderBasePassMobile_RenderThread</span><span class="p">(</span><span class="n">FRHICommandList</span><span class="o">&amp;</span> <span class="n">RHICmdList</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="p">{}</span>
+<span class="o">&lt;</span><span class="p">...</span><span class="o">&gt;</span>
+
+</code></pre></div></div>
+
+<p>In this blog post I will only touch on <code class="language-plaintext highlighter-rouge">virtual void PostRenderBasePass_RenderThread(FRHICommandListImmediate&amp; RHICmdList, FSceneView&amp; InView)</code>, but I highly encourage you to look into this class to check its full capabilities yourself.
+Let’s expand on this class to make our own render pass in <code class="language-plaintext highlighter-rouge">CustomViewExtension.h</code></p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">//AuraShaderModule/Public/CustomViewExtension.h</span>
+<span class="cp">#pragma once
+</span>
+<span class="cp">#include "SceneViewExtension.h"
+</span>
+<span class="k">class</span> <span class="nc">CUSTOMMODULE_API</span> <span class="n">FCustomViewExtension</span> <span class="o">:</span> <span class="k">public</span> <span class="n">FSceneViewExtensionBase</span> <span class="p">{</span>
+<span class="nl">public:</span>
+<span class="n">FCustomViewExtension</span><span class="p">(</span><span class="k">const</span> <span class="n">FAutoRegister</span><span class="o">&amp;</span> <span class="n">AutoRegister</span><span class="p">,</span> <span class="n">FLinearColor</span> <span class="n">edgeColor</span><span class="p">,</span> <span class="kt">float</span> <span class="n">depthBias</span><span class="p">,</span> <span class="kt">float</span> <span class="n">edgeThickness</span><span class="p">,</span> <span class="kt">float</span> <span class="n">edgeIntensity</span><span class="p">,</span> <span class="kt">float</span> <span class="n">noiseSize</span><span class="p">,</span> <span class="kt">float</span> <span class="n">noiseStrength</span><span class="p">,</span> <span class="kt">float</span> <span class="n">movementSpeed</span><span class="p">,</span> <span class="n">UTexture2D</span><span class="o">*</span> <span class="n">texture</span><span class="p">);</span>
+
+<span class="c1">//~ Begin FSceneViewExtensionBase Interface</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">SetupViewFamily</span><span class="p">(</span><span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">SetupView</span><span class="p">(</span><span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">BeginRenderViewFamily</span><span class="p">(</span><span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">PreRenderViewFamily_RenderThread</span><span class="p">(</span><span class="n">FRHICommandListImmediate</span><span class="o">&amp;</span> <span class="n">RHICmdList</span><span class="p">,</span> <span class="n">FSceneViewFamily</span><span class="o">&amp;</span> <span class="n">InViewFamily</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">PreRenderView_RenderThread</span><span class="p">(</span><span class="n">FRHICommandListImmediate</span><span class="o">&amp;</span> <span class="n">RHICmdList</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">PostRenderBasePass_RenderThread</span><span class="p">(</span><span class="n">FRHICommandListImmediate</span><span class="o">&amp;</span> <span class="n">RHICmdList</span><span class="p">,</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">InView</span><span class="p">)</span> <span class="k">override</span> <span class="p">{};</span>
+<span class="k">virtual</span> <span class="kt">void</span> <span class="n">PrePostProcessPass_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="k">const</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">View</span><span class="p">,</span> <span class="k">const</span> <span class="n">FPostProcessingInputs</span><span class="o">&amp;</span> <span class="n">Inputs</span><span class="p">)</span> <span class="k">override</span><span class="p">;</span>
+<span class="c1">//~ End FSceneViewExtensionBase Interface</span>
+
+<span class="kt">void</span> <span class="n">SetEdgeColor</span><span class="p">(</span><span class="k">const</span> <span class="n">FLinearColor</span><span class="o">&amp;</span> <span class="n">color</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetDepthBias</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">bias</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetEdgeThickness</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">thickness</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetEdgeIntensity</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">intensity</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetSceneDepthSize</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">size</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetNoiseSize</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">size</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetNoiseStrength</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">strength</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetTime</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">time</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetMovementSpeed</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">&amp;</span> <span class="n">speed</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetDebugLines</span><span class="p">(</span><span class="k">const</span> <span class="kt">bool</span><span class="o">&amp;</span> <span class="n">debug</span><span class="p">);</span>
+<span class="kt">void</span> <span class="n">SetNoiseTexture</span><span class="p">(</span><span class="n">UTexture2D</span><span class="o">*</span> <span class="n">tex</span><span class="p">);</span>
+
+<span class="nl">private:</span>
+<span class="n">FLinearColor</span> <span class="n">EdgeColor</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">DepthBias</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">EdgeThickness</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">EdgeIntensity</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">NoiseSize</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">Time</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">MovementSpeed</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">NoiseStrength</span><span class="p">;</span>
+<span class="kt">uint32_t</span> <span class="n">DebugLines</span><span class="p">;</span>
+<span class="n">UTexture2D</span><span class="o">*</span> <span class="n">NoiseTex</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>All we need to do is override the <code class="language-plaintext highlighter-rouge">PostRenderBasePass_RenderThread</code> function and declare all our variables, as well as the setters.
+Next, in the .cpp file is were we implement the logic, specifically in <code class="language-plaintext highlighter-rouge">PostRenderBasePass_RenderThread</code>.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="kt">void</span> <span class="n">FMyViewExtension</span><span class="o">::</span><span class="n">PrePostProcessPass_RenderThread</span><span class="p">(</span><span class="n">FRDGBuilder</span><span class="o">&amp;</span> <span class="n">GraphBuilder</span><span class="p">,</span> <span class="k">const</span> <span class="n">FSceneView</span><span class="o">&amp;</span> <span class="n">View</span><span class="p">,</span> <span class="k">const</span> <span class="n">FPostProcessingInputs</span><span class="o">&amp;</span> <span class="n">Inputs</span><span class="p">)</span> <span class="p">{</span>
+
+<span class="k">if</span> <span class="p">((</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">CustomDepthTexture</span><span class="o">-&gt;</span><span class="n">Desc</span><span class="p">.</span><span class="n">Format</span> <span class="o">!=</span> <span class="n">PF_DepthStencil</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span> 
+
+<span class="n">checkSlow</span><span class="p">(</span><span class="n">View</span><span class="p">.</span><span class="n">bIsViewInfo</span><span class="p">);</span>
+
+<span class="c1">//We check if the texture is valid</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">NoiseTex</span> <span class="o">==</span> <span class="nb">nullptr</span><span class="p">)</span>
+    <span class="k">return</span><span class="p">;</span>
+
+<span class="k">const</span> <span class="n">FIntRect</span> <span class="n">Viewport</span> <span class="o">=</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="k">const</span> <span class="n">FViewInfo</span><span class="o">&amp;&gt;</span><span class="p">(</span><span class="n">View</span><span class="p">).</span><span class="n">ViewRect</span><span class="p">;</span>
+<span class="n">FScreenPassTexture</span> <span class="n">SceneColor</span><span class="p">((</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">SceneColorTexture</span><span class="p">,</span> <span class="n">Viewport</span><span class="p">);</span>
+<span class="n">FGlobalShaderMap</span><span class="o">*</span> <span class="n">GlobalShaderMap</span> <span class="o">=</span> <span class="n">GetGlobalShaderMap</span><span class="p">(</span><span class="n">GMaxRHIFeatureLevel</span><span class="p">);</span>
+
+<span class="n">RDG_EVENT_SCOPE</span><span class="p">(</span><span class="n">GraphBuilder</span><span class="p">,</span> <span class="s">"Aura Render Pass"</span><span class="p">);</span>
+
+<span class="c1">// Viewport parameters</span>
+<span class="k">const</span> <span class="n">FScreenPassTextureViewport</span> <span class="n">SceneColorTextureViewport</span><span class="p">(</span><span class="n">SceneColor</span><span class="p">);</span>
+<span class="k">const</span> <span class="n">FScreenPassTextureViewportParameters</span> <span class="n">SceneTextureViewportParams</span> <span class="o">=</span> <span class="n">GetTextureViewportParameters</span><span class="p">(</span><span class="n">SceneColorTextureViewport</span><span class="p">);</span>
+
+<span class="c1">// Render targets</span>
+<span class="n">FScreenPassRenderTarget</span> <span class="n">SceneColorCopyRenderTarget</span><span class="p">;</span>
+<span class="n">SceneColorCopyRenderTarget</span><span class="p">.</span><span class="n">Texture</span> <span class="o">=</span> <span class="n">GraphBuilder</span><span class="p">.</span><span class="n">CreateTexture</span><span class="p">((</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">SceneColorTexture</span><span class="o">-&gt;</span><span class="n">Desc</span><span class="p">,</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"Scene Color Copy"</span><span class="p">));</span>
+<span class="n">FScreenPassRenderTarget</span> <span class="n">UVMaskRenderTarget</span><span class="p">;</span>
+<span class="n">UVMaskRenderTarget</span><span class="p">.</span><span class="n">Texture</span> <span class="o">=</span> <span class="n">GraphBuilder</span><span class="p">.</span><span class="n">CreateTexture</span><span class="p">((</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">SceneColorTexture</span><span class="o">-&gt;</span><span class="n">Desc</span><span class="p">,</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"UV Mask"</span><span class="p">));</span>
+
+<span class="c1">//Getting the noise texture</span>
+<span class="n">FTextureResource</span><span class="o">*</span> <span class="n">TextureResource</span> <span class="o">=</span> <span class="n">NoiseTex</span><span class="o">-&gt;</span><span class="n">GetResource</span><span class="p">();</span>
+<span class="n">FTextureRHIRef</span> <span class="n">TextureRHI</span> <span class="o">=</span> <span class="n">TextureResource</span><span class="o">-&gt;</span><span class="n">TextureRHI</span><span class="p">;</span>
+<span class="k">auto</span> <span class="n">noiseTexture</span> <span class="o">=</span> <span class="n">GraphBuilder</span><span class="p">.</span><span class="n">RegisterExternalTexture</span><span class="p">(</span><span class="n">CreateRenderTarget</span><span class="p">(</span><span class="n">TextureRHI</span><span class="p">,</span> <span class="n">TEXT</span><span class="p">(</span><span class="s">"NoiseTexture"</span><span class="p">)));</span>
+
+<span class="c1">// Shader setup</span>
+<span class="n">TShaderMapRef</span><span class="o">&lt;</span><span class="n">FAuraShaderPS</span><span class="o">&gt;</span> <span class="n">AuraPixelShader</span><span class="p">(</span><span class="n">GlobalShaderMap</span><span class="p">);</span>
+<span class="n">FAuraShaderPS</span><span class="o">::</span><span class="n">FParameters</span><span class="o">*</span> <span class="n">AuraParameters</span> <span class="o">=</span> <span class="n">GraphBuilder</span><span class="p">.</span><span class="n">AllocParameters</span><span class="o">&lt;</span><span class="n">FAuraShaderPS</span><span class="o">::</span><span class="n">FParameters</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">SceneColor</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">SceneColorTexture</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">SceneDepth</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">Inputs</span><span class="p">.</span><span class="n">SceneTextures</span><span class="p">)</span><span class="o">-&gt;</span><span class="n">SceneDepthTexture</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">InputSampler</span> <span class="o">=</span> <span class="n">TStaticSamplerState</span><span class="o">&lt;</span><span class="n">SF_Point</span><span class="p">,</span> <span class="n">AM_Wrap</span><span class="p">,</span> <span class="n">AM_Wrap</span><span class="p">,</span> <span class="n">AM_Wrap</span><span class="o">&gt;::</span><span class="n">GetRHI</span><span class="p">();</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">LineColor</span> <span class="o">=</span> <span class="n">EdgeColor</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">DepthBias</span> <span class="o">=</span> <span class="n">DepthBias</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">EdgeThickness</span> <span class="o">=</span> <span class="n">EdgeThickness</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">EdgeIntensity</span> <span class="o">=</span> <span class="n">EdgeIntensity</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">NoiseSize</span> <span class="o">=</span> <span class="n">NoiseSize</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">NoiseStrength</span> <span class="o">=</span> <span class="n">NoiseStrength</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">MovementSpeed</span> <span class="o">=</span> <span class="n">MovementSpeed</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">Time</span> <span class="o">=</span> <span class="n">Time</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">DebugLines</span> <span class="o">=</span> <span class="n">DebugLines</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">Noise</span> <span class="o">=</span> <span class="n">noiseTexture</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">ViewParams</span> <span class="o">=</span> <span class="n">SceneTextureViewportParams</span><span class="p">;</span>
+<span class="n">AuraParameters</span><span class="o">-&gt;</span><span class="n">RenderTargets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">FRenderTargetBinding</span><span class="p">(</span><span class="n">SceneColor</span><span class="p">.</span><span class="n">Texture</span><span class="p">,</span> <span class="n">ERenderTargetLoadAction</span><span class="o">::</span><span class="n">ELoad</span><span class="p">);</span>
+
+<span class="n">FPixelShaderUtils</span><span class="o">::</span><span class="n">AddFullscreenPass</span><span class="p">(</span>
+    <span class="n">GraphBuilder</span><span class="p">,</span>
+    <span class="n">GlobalShaderMap</span><span class="p">,</span>
+    <span class="n">FRDGEventName</span><span class="p">(</span><span class="n">TEXT</span><span class="p">(</span><span class="s">"Aura"</span><span class="p">)),</span>
+    <span class="n">AuraPixelShader</span><span class="p">,</span>
+    <span class="n">AuraParameters</span><span class="p">,</span>
+    <span class="n">Viewport</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>This is a lot to take in, but all we are doing is</p>
+
+<ol>
+  <li>Checking validity of resources</li>
+  <li>Getting the viewport parameters</li>
+  <li>Getting scene textures and render targets</li>
+  <li>Setting the values into an instance of an input struct that we created earlier</li>
+  <li>Adding the pass</li>
+</ol>
+
+<p>A thing worth noting is <code class="language-plaintext highlighter-rouge">GetTextureViewportParameters(SceneColorTextureViewport)</code>. This is a function I got from a <a href="https://itscai.us/blog/post/ue-view-extensions/">blog post</a> I learned all of this from. I highly recommend giving it a look as well. This is the function.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">FScreenPassTextureViewportParameters</span> <span class="nf">GetTextureViewportParameters</span><span class="p">(</span><span class="k">const</span> <span class="n">FScreenPassTextureViewport</span><span class="o">&amp;</span> <span class="n">InViewport</span><span class="p">)</span> <span class="p">{</span>
+<span class="k">const</span> <span class="n">FVector2f</span> <span class="n">Extent</span><span class="p">(</span><span class="n">InViewport</span><span class="p">.</span><span class="n">Extent</span><span class="p">);</span>
+<span class="k">const</span> <span class="n">FVector2f</span> <span class="n">ViewportMin</span><span class="p">(</span><span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Min</span><span class="p">.</span><span class="n">X</span><span class="p">,</span> <span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Min</span><span class="p">.</span><span class="n">Y</span><span class="p">);</span>
+<span class="k">const</span> <span class="n">FVector2f</span> <span class="n">ViewportMax</span><span class="p">(</span><span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Max</span><span class="p">.</span><span class="n">X</span><span class="p">,</span> <span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Max</span><span class="p">.</span><span class="n">Y</span><span class="p">);</span>
+<span class="k">const</span> <span class="n">FVector2f</span> <span class="n">ViewportSize</span> <span class="o">=</span> <span class="n">ViewportMax</span> <span class="o">-</span> <span class="n">ViewportMin</span><span class="p">;</span>
+
+<span class="n">FScreenPassTextureViewportParameters</span> <span class="n">Parameters</span><span class="p">;</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="n">InViewport</span><span class="p">.</span><span class="n">IsEmpty</span><span class="p">())</span> <span class="p">{</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">Extent</span> <span class="o">=</span> <span class="n">FVector2f</span><span class="p">(</span><span class="n">Extent</span><span class="p">);</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ExtentInverse</span> <span class="o">=</span> <span class="n">FVector2f</span><span class="p">(</span><span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Extent</span><span class="p">.</span><span class="n">X</span><span class="p">,</span> <span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Extent</span><span class="p">.</span><span class="n">Y</span><span class="p">);</span>
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ScreenPosToViewportScale</span> <span class="o">=</span> <span class="n">FVector2f</span><span class="p">(</span><span class="mf">0.5</span><span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="n">f</span><span class="p">)</span> <span class="o">*</span> <span class="n">ViewportSize</span><span class="p">;</span>	
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ScreenPosToViewportBias</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span><span class="n">f</span> <span class="o">*</span> <span class="n">ViewportSize</span><span class="p">)</span> <span class="o">+</span> <span class="n">ViewportMin</span><span class="p">;</span>	
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportMin</span> <span class="o">=</span> <span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Min</span><span class="p">;</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportMax</span> <span class="o">=</span> <span class="n">InViewport</span><span class="p">.</span><span class="n">Rect</span><span class="p">.</span><span class="n">Max</span><span class="p">;</span>
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportSize</span> <span class="o">=</span> <span class="n">ViewportSize</span><span class="p">;</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportSizeInverse</span> <span class="o">=</span> <span class="n">FVector2f</span><span class="p">(</span><span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportSize</span><span class="p">.</span><span class="n">X</span><span class="p">,</span> <span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ViewportSize</span><span class="p">.</span><span class="n">Y</span><span class="p">);</span>
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMin</span> <span class="o">=</span> <span class="n">ViewportMin</span> <span class="o">*</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ExtentInverse</span><span class="p">;</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMax</span> <span class="o">=</span> <span class="n">ViewportMax</span> <span class="o">*</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ExtentInverse</span><span class="p">;</span>
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportSize</span> <span class="o">=</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMax</span> <span class="o">-</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMin</span><span class="p">;</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportSizeInverse</span> <span class="o">=</span> <span class="n">FVector2f</span><span class="p">(</span><span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportSize</span><span class="p">.</span><span class="n">X</span><span class="p">,</span> <span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportSize</span><span class="p">.</span><span class="n">Y</span><span class="p">);</span>
+
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportBilinearMin</span> <span class="o">=</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMin</span> <span class="o">+</span> <span class="mf">0.5</span><span class="n">f</span> <span class="o">*</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ExtentInverse</span><span class="p">;</span>
+    <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportBilinearMax</span> <span class="o">=</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">UVViewportMax</span> <span class="o">-</span> <span class="mf">0.5</span><span class="n">f</span> <span class="o">*</span> <span class="n">Parameters</span><span class="p">.</span><span class="n">ExtentInverse</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">return</span> <span class="n">Parameters</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Finally we are done setting this up. Now we can move to the very last step.</p>
+
+<h3 id="implementing-the-scene-view-extension">Implementing the scene view extension</h3>
+
+<p>This is the last and most simple step here. All we have to do to start up our render pass is call the SceneViewExtension constructor somewhere in our game. I personally like having it in a blueprint, on BeginPlay(). I recommend you do it as well, to avoid any annoying crashes caused by errors.</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="n">ACustomPass</span><span class="o">::</span><span class="n">BeginPlay</span><span class="p">()</span>
+<span class="p">{</span>
+	<span class="n">Super</span><span class="o">::</span><span class="n">BeginPlay</span><span class="p">();</span>
+	<span class="n">MyViewExtension</span> <span class="o">=</span> <span class="n">FSceneViewExtensions</span><span class="o">::</span><span class="n">NewExtension</span><span class="o">&lt;</span><span class="n">FMyViewExtension</span><span class="o">&gt;</span><span class="p">(</span><span class="n">EdgeColor</span><span class="p">,</span> <span class="n">DepthBias</span><span class="p">,</span> <span class="n">EdgeThickness</span><span class="p">,</span> <span class="n">EdgeIntensity</span><span class="p">,</span> <span class="n">NoiseSize</span><span class="p">,</span> <span class="n">NoiseStrength</span><span class="p">,</span> <span class="n">NoiseMovementSpeed</span><span class="p">,</span> <span class="n">NoiseTex</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Lastly, you can also set all the variables in the tick function, so you can modify them in the editor as well.
+Now compile and press play!
+<img src="Assets/images/Fog+Aura2.gif" alt="alt text" title="Title" /></p>
+
+<p>(For extra effect I also added a very simple fog using the depth stencil ;) )</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Wile definitely not the only ones existing, these are the ways of using external shaders and HLSL I have found during my research. A lot of these are heavily based on other blog posts that I have found, so I will list them here.</p>
+
+<ol>
+  <li><a href="https://viclw17.github.io/2022/02/01/unreal-engine-custom-node">Unreal Engine Custom Node by 1000 Forms of Bunnies</a></li>
+  <li><a href="https://itscai.us/blog/post/ue-view-extensions/">Global shaders in Unreal without engine modification by Caius</a></li>
+  <li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/adding-global-shaders-to-unreal-engine">Unreal Engine’s documentation on global shaders</a></li>
+  <li><a href="https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html">UE4 Shaders Introduction by Riccardo Loggini</a></li>
+</ol>
+
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        
+        <p class="copyright">Blog post maintained by <a href="https://github.com/KarolinaMot">KarolinaMot</a></p>
+        <p class="copyright">Email: karolina.motuzyte02@gmail.com</p>
+
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+  </body>
+</html>
