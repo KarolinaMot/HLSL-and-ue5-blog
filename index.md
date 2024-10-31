@@ -80,7 +80,7 @@ Generate a solution file. This can be done through UE5 by right clicking the .up
 
 Open the project in Visual Studio.
 
-All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use AddShaderSourceDirectoryMapping() to add an additional shader directory.
+All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use `AddShaderSourceDirectoryMapping()` to add an additional shader directory.
 
 ```c++
     PublicDependencyModuleNames.AddRange(new string[] { "Core", "RenderCore", "CoreUObject", "Engine", "InputCore"});

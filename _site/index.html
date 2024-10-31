@@ -92,30 +92,28 @@
 
 <p>Let’s look at the  SceneTextureLookup(uv, texIndex,) function. With this function we sample the scene depth texture. The reason why in this case the index is 1 can be seen in the SceneTexture node, in the “Scene Texture Id” field.</p>
 
-<p><img src="Assets/images/SceneTextureIndices.png" alt="alt text" title="Title" /></p>
+<p><img src="assets/images/SceneTextureIndices.png" alt="alt text" title="Title" /></p>
 
 <p>As it can be seen the node now requires a few inputs – UV, EdgeThickness, ScreenSize, DepthBias and DepthPrecision. This can be added through the node’s details window:</p>
 
-<p><img src="Assets/images/CustomNodeInputs.png" alt="alt text" title="Title" /></p>
+<p><img src="assets/images/CustomNodeInputs.png" alt="alt text" title="Title" /></p>
 
 <p>We need to add another input, here called Color, to plug in a SceneTexture node. This value does not have to be referenced or used, as it is only needed so we can use the aforementioned function <code class="language-plaintext highlighter-rouge">SceneTextureLookup()</code>.</p>
 
 <p>Next, a thing to note is the return type of the snippet – float. By default, the custom node returns a float4. This can also be changed through the node’s details window.</p>
 
-<p><img src="Assets/images/CustomNodeReturnType.png" alt="alt text" title="Title" /></p>
+<p><img src="assets/images/CustomNodeReturnType.png" alt="alt text" title="Title" /></p>
 
 <p>Once everything is plugged in and the parameters are set, this is the result we get:</p>
 
-<p><img src="Assets/images/CustomNodeBP.png" alt="alt text" title="Title" />
-<img src="Assets/images/Outlines.png" alt="alt text" title="Title" /></p>
-
-<p>//insert result image</p>
+<p><img src="assets/images/CustomNodeBP.png" alt="alt text" title="Title" />
+<img src="assets/images/Outlines.png" alt="alt text" title="Title" /></p>
 
 <h2 id="using-external-shaders-with-the-custom-node">Using external shaders with the custom node</h2>
 
 <p>If you have experience with the custom node already, you might have noticed that there is an input for include paths.</p>
 
-<p><img src="Assets/images/IncludeFilePaths.png" alt="alt text" title="Title" /></p>
+<p><img src="assets/images/IncludeFilePaths.png" alt="alt text" title="Title" /></p>
 
 <p>These become really useful once you the shader code becomes too extensive and you would rather use a text editor to deal with it. Unfortunately, UE5 does not expect you to use HLSL code at all, thus using external HLSL files is not as straightforward as it could be.</p>
 
@@ -129,7 +127,7 @@
 
 <p>Open the project in Visual Studio.</p>
 
-<p>All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use AddShaderSourceDirectoryMapping() to add an additional shader directory.</p>
+<p>All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use <code class="language-plaintext highlighter-rouge">AddShaderSourceDirectoryMapping()</code> to add an additional shader directory.</p>
 
 <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="n">PublicDependencyModuleNames</span><span class="p">.</span><span class="n">AddRange</span><span class="p">(</span><span class="k">new</span> <span class="n">string</span><span class="p">[]</span> <span class="p">{</span> <span class="s">"Core"</span><span class="p">,</span> <span class="s">"RenderCore"</span><span class="p">,</span> <span class="s">"CoreUObject"</span><span class="p">,</span> <span class="s">"Engine"</span><span class="p">,</span> <span class="s">"InputCore"</span><span class="p">});</span>
 </code></pre></div></div>
@@ -267,7 +265,7 @@
 <span class="k">return</span> <span class="n">detect</span><span class="p">.</span><span class="n">DetectEdge</span><span class="p">(</span><span class="n">Uv</span><span class="p">,</span> <span class="n">Color</span><span class="p">,</span> <span class="n">LineThickness</span><span class="p">,</span> <span class="n">ScreenSize</span><span class="p">,</span> <span class="n">DepthBias</span><span class="p">,</span> <span class="n">DepthPrecision</span><span class="p">,</span> <span class="n">Noise</span><span class="p">,</span> <span class="n">NoiseStrength</span><span class="p">,</span> <span class="n">TendrilColor</span><span class="p">,</span> <span class="n">DebugLines</span><span class="p">);</span>
 </code></pre></div></div>
 <p>This is the final result!
-<img src="Assets/images/Aura.gif" alt="alt text" title="Title" /></p>
+<img src="assets/images/Aura.gif" alt="alt text" title="Title" /></p>
 
 <h2 id="global-shaders-and-sceneviewextension">Global Shaders and SceneViewExtension</h2>
 
@@ -778,7 +776,7 @@ Next, in the .cpp file is were we implement the logic, specifically in <code cla
 
 <p>Lastly, you can also set all the variables in the tick function, so you can modify them in the editor as well.
 Now compile and press play!
-<img src="Assets/images/Fog+Aura2.gif" alt="alt text" title="Title" /></p>
+<img src="assets/images/Fog+Aura2.gif" alt="alt text" title="Title" /></p>
 
 <p>(For extra effect I also added a very simple fog using the depth stencil ;) )</p>
 

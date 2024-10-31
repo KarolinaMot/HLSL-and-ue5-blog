@@ -45,30 +45,28 @@ float2 gradients = float2(0.f, 0.f);
 
 Let’s look at the  SceneTextureLookup(uv, texIndex,) function. With this function we sample the scene depth texture. The reason why in this case the index is 1 can be seen in the SceneTexture node, in the “Scene Texture Id” field.
 
-![alt text](Assets/images/SceneTextureIndices.png "Title")
+![alt text](assets/images/SceneTextureIndices.png "Title")
 
 As it can be seen the node now requires a few inputs – UV, EdgeThickness, ScreenSize, DepthBias and DepthPrecision. This can be added through the node's details window:
 
-![alt text](Assets/images/CustomNodeInputs.png "Title")
+![alt text](assets/images/CustomNodeInputs.png "Title")
 
 We need to add another input, here called Color, to plug in a SceneTexture node. This value does not have to be referenced or used, as it is only needed so we can use the aforementioned function `SceneTextureLookup()`.
 
 Next, a thing to note is the return type of the snippet – float. By default, the custom node returns a float4. This can also be changed through the node's details window.
 
-![alt text](Assets/images/CustomNodeReturnType.png "Title")
+![alt text](assets/images/CustomNodeReturnType.png "Title")
 
 Once everything is plugged in and the parameters are set, this is the result we get:
 
-![alt text](Assets/images/CustomNodeBP.png "Title")
-![alt text](Assets/images/Outlines.png "Title")
-
-//insert result image
+![alt text](assets/images/CustomNodeBP.png "Title")
+![alt text](assets/images/Outlines.png "Title")
 
 ## Using external shaders with the custom node
 
 If you have experience with the custom node already, you might have noticed that there is an input for include paths.
 
-![alt text](Assets/images/IncludeFilePaths.png "Title")
+![alt text](assets/images/IncludeFilePaths.png "Title")
 
 These become really useful once you the shader code becomes too extensive and you would rather use a text editor to deal with it. Unfortunately, UE5 does not expect you to use HLSL code at all, thus using external HLSL files is not as straightforward as it could be.
 
@@ -82,7 +80,7 @@ Generate a solution file. This can be done through UE5 by right clicking the .up
 
 Open the project in Visual Studio.
 
-All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use AddShaderSourceDirectoryMapping() to add an additional shader directory.
+All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use `AddShaderSourceDirectoryMapping()` to add an additional shader directory.
 
 ```c++
     PublicDependencyModuleNames.AddRange(new string[] { "Core", "RenderCore", "CoreUObject", "Engine", "InputCore"});
@@ -226,7 +224,7 @@ DetectEdges detect;
 return detect.DetectEdge(Uv, Color, LineThickness, ScreenSize, DepthBias, DepthPrecision, Noise, NoiseStrength, TendrilColor, DebugLines);
 ```
 This is the final result!
-![alt text](Assets/images/Aura.gif "Title")
+![alt text](assets/images/Aura.gif "Title")
 
 
 ## Global Shaders and SceneViewExtension
@@ -742,7 +740,7 @@ void ACustomPass::BeginPlay()
 
 Lastly, you can also set all the variables in the tick function, so you can modify them in the editor as well.
 Now compile and press play!
-![alt text](Assets/images/Fog+Aura2.gif "Title")
+![alt text](assets/images/Fog+Aura2.gif "Title")
 
 (For extra effect I also added a very simple fog using the depth stencil ;) )
 

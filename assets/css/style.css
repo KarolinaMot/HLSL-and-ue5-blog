@@ -171,13 +171,13 @@ em, cite { font-style: italic; }
 
 strong { font-weight: bold; }
 
-img { position: relative; margin: 0 auto; max-width: 739px; padding: 5px; margin: 10px 0 10px 0; box-shadow: 0 0 5px #ebebeb; -webkit-box-shadow: 0 0 5px #ebebeb; -moz-box-shadow: 0 0 5px #ebebeb; -o-box-shadow: 0 0 5px #ebebeb; -ms-box-shadow: 0 0 5px #ebebeb; }
+img { position: relative; margin: 0 auto; max-width: 739px; padding: 5px; margin: 10px 0 10px 0;}
 
 p img { display: inline; margin: 0; padding: 0; vertical-align: middle; text-align: center; border: none; }
 
 pre, code { color: #dbdada; background-color: #2e2d2e; font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace; font-size: 0.875em; border-radius: 15px; -moz-border-radius: 15px; -webkit-border-radius: 15px;}
 
-pre { border: 0px; background-color: #2e2d2e; overflow: auto; border-radius: 15px; -moz-border-radius: 15px; -webkit-border-radius: 15px; }
+pre { border: 0px; background-color: #212121; overflow: auto; border-radius: 15px; -moz-border-radius: 15px; -webkit-border-radius: 15px; }
 
 code { padding: 3px; margin: 0 0px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
 
