@@ -7,11 +7,11 @@ In this post, I will showcase some ways to create shaders using HLSL and explain
 
 ## The custom node
 
-The simplest and quickest way of creating shaders with HLSL is by using the custom node in the material graph.
+The easiest and fastest way to create shaders with HLSL in UE5 is by using the custom node in the material graph.
 
-Let’s create a very simple edge detection shader using the scene depth buffer. If you have never used a Sobel matrix for this, and you’d like to know how it works, I welcome you to watch [this video](https://www.youtube.com/watch?v=PXLgkxRizPI&t=1158s), which explains it.
+Let’s create a simple edge detection shader using the scene depth buffer. If you’re unfamiliar with using a Sobel matrix for this purpose, I recommend watching [this video](https://www.youtube.com/watch?v=PXLgkxRizPI&t=1158s), which explains the basics.
 
-First, we start by writing the shader code. This can be done directly in the node’s HLSL input.
+First, we’ll write the shader code directly in the node’s HLSL input:
 
 ```c++
 float2 pixelSize = LineThickness / ScreenSize;
@@ -43,50 +43,48 @@ float2 gradients = float2(0.f, 0.f);
  return length(gradients);
 ```
 
-Let’s look at the  SceneTextureLookup(uv, texIndex,) function. With this function we sample the scene depth texture. The reason why in this case the index is 1 can be seen in the SceneTexture node, in the “Scene Texture Id” field.
+The SceneTextureLookup(uv, texIndex, ...) function samples the scene depth texture, and here, the index is set to 1 based on the “Scene Texture Id” in the SceneTexture node.
 
 ![alt text](assets/images/SceneTextureIndices.png "Title")
 
-As it can be seen the node now requires a few inputs – UV, EdgeThickness, ScreenSize, DepthBias and DepthPrecision. This can be added through the node's details window:
+The node requires a few inputs—UV, EdgeThickness, ScreenSize, DepthBias, and DepthPrecision—which can be added through the node’s details window:
 
 ![alt text](assets/images/CustomNodeInputs.png "Title")
 
-We need to add another input, here called Color, to plug in a SceneTexture node. This value does not have to be referenced or used, as it is only needed so we can use the aforementioned function `SceneTextureLookup()`.
+We also add an input named “Color” to plug in a SceneTexture node. It doesn’t need to be used or referenced directly; it’s there so that we can use `SceneTextureLookup()`.
 
-Next, a thing to note is the return type of the snippet – float. By default, the custom node returns a float4. This can also be changed through the node's details window.
+Next, set the return type of the node snippet to float in the node’s details.
 
 ![alt text](assets/images/CustomNodeReturnType.png "Title")
 
-Once everything is plugged in and the parameters are set, this is the result we get:
+Once everything is connected, this is the result
 
 ![alt text](assets/images/CustomNodeBP.png "Title")
 ![alt text](assets/images/Outlines.png "Title")
 
 ## Using external shaders with the custom node
 
-If you have experience with the custom node already, you might have noticed that there is an input for include paths.
+If you’re familiar with the custom node, you may have noticed an input for include paths:
 
 ![alt text](assets/images/IncludeFilePaths.png "Title")
 
-These become really useful once you the shader code becomes too extensive and you would rather use a text editor to deal with it. Unfortunately, UE5 does not expect you to use HLSL code at all, thus using external HLSL files is not as straightforward as it could be.
+Include paths become useful when shader code grows in complexity, and you’d prefer to work in a text editor. UE5 does not expect external HLSL files, so using them requires a bit of setup.
 
 ### Setup
 
-The default path for shaders is the engine folder, which is inconvenient if you’d like to source control your shaders. To fix this, we want to add another shader directory by modifying the primary game module. This will require us to use some C++ and to have Visual Studio installed.
+The default shader path is in the engine folder, but if you’d like to keep your shaders under version control, we’ll set up an alternative path in the game module. This requires some C++ knowledge and Visual Studio.
 
-The first step is to create a “Shaders” folder in the root project folder.
+1. Create a Shaders folder in your project’s root directory.
+2. Generate a solution file by right-clicking the .uproject file and selecting “Generate Visual Studio Project Files.”
+3. Open the project in Visual Studio.
 
-Generate a solution file. This can be done through UE5 by right clicking the .uproject file and selecting “Generate Visual Studio Project Files”.
-
-Open the project in Visual Studio.
-
-All the files that will be need to be modified are under the filter “Source/ProjectName”. First we want to add “RenderCore” as a public dependency module. This can be done by editing the “ProjectName.Build.cs” file. If you do not add this, you will not be able to use `AddShaderSourceDirectoryMapping()` to add an additional shader directory.
+In the `Source/ProjectName` folder, update `ProjectName.Build.cs` to add `RenderCore` as a public dependency module:
 
 ```c++
     PublicDependencyModuleNames.AddRange(new string[] { "Core", "RenderCore", "CoreUObject", "Engine", "InputCore"});
 ```
 
-Now in “ProjectName.h” we create a game module class:
+In `ProjectName.h`, create a game module class:
 
 ```c++
 //ProjectName.h
@@ -100,14 +98,16 @@ virtual void ShutdownModule() override;
 };
 ```
 
-In “ProjectName.cpp” we define the StartupModule() function, and inside we add the secondary directory to the Shaders folder we previously created.
+In ProjectName.cpp, define StartupModule() to add the Shaders folder as a secondary directory:
 
 ```c++
 FString ShaderDirectory = FPaths::Combine(FPaths::ProjectDir(), TEXT("Shaders"));
 AddShaderSourceDirectoryMapping("/Project", ShaderDirectory);
 ```
 
-Finally, we override the primary game module by using the macro `IMPLEMENT_PRIMARY_GAME_MODULE(FProjectModule, ProjectName, "ModuleRulesName");`
+
+Finally, override the primary game module with `IMPLEMENT_PRIMARY_GAME_MODULE(FProjectModule, ProjectName, ModuleRulesName);`
+
 
 These is the final file:
 
@@ -136,7 +136,7 @@ Once this is all done, you can press F5 to launch UE5.
 
 ### Using it
 
-To complicate the previous shader, let’s say we want to apply a noise texture along the edges of the objects.
+To expand the previous shader, let’s say we want to apply a noise texture along the edges of the objects.
 
 Shaders in UE5 have to be created with the .ush or .usf extensions, so let’s create a new file in the “Shaders” folder we created and call it “EdgeDetection.ush”.
 
@@ -215,7 +215,7 @@ struct DetectEdges
 };
 ```
 
-The way the custom node works, is that it inserts your code in the generated shader in a function called `MaterialFloat3 CustomExpression0()`. You can check this by going to Window->ShaderCode->HLSL Code. For this reason, when you want to encapsulate something in a function, you must do so by using structs.
+The custom node inserts your code in a function called `MaterialFloat3 CustomExpression0()`. You can check this by going to Window->ShaderCode->HLSL Code, which shows you the generated shader for your material graph. For this reason, when you want to encapsulate something in a function, you must do so by using structs.
 
 Now to finally to use this shader, you plug everything in, you add the include path to the right slot, in this case “/Project/EdgeDetection.ush” and call the function in the node like this:
 
@@ -225,39 +225,49 @@ return detect.DetectEdge(Uv, Color, LineThickness, ScreenSize, DepthBias, DepthP
 ```
 
 This is the final result!
+
 ![alt text](assets/images/Aura.gif "Title")
 
 ## Global Shaders and SceneViewExtension
 
-Disclaimer: this method requires you to have some decent knowledge in C++ and graphics programming.
+| Note: This approach requires familiarity with C++ and graphics programming.
 
-The previous ways are fine, but for more complex shaders that require multiple passes you might want to take a look into SceneViewExtensions. What this class does is it lets you “inject” custom render passes into UE5 without having to modify the engine’s source code. Meanwhile, Global Shaders, according to UE5’s documentation, are “shaders that are not created using the Material Editor. Instead, they are created using C++, operate on fixed geometry and do not need to interface with materials or a mesh.” For this reason, Global shaders are perfect for post processing effects. You could also use PostProcessingShaders, but those are still tied to the post processing pipeline, which means you’d need to modify the source code. If you want to read more on the type of shaders unreal uses, I recommend this [blog post](https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html ).
+While custom nodes work well for simpler shaders, more complex effects that require multiple rendering passes are best achieved using SceneViewExtensions and Global Shaders. Here’s an overview of what these two features do and how they enable advanced rendering effects in UE5.
+
+### Why Use SceneViewExtensions and Global Shaders?
+
+*SceneViewExtension* allows you to inject custom render passes without modifying the Unreal Engine source code. This means you can add custom post-processing steps and advanced effects to the UE5 rendering pipeline.
+
+*Global Shaders* are shaders created with C++ that operate on fixed geometry and don’t need to interact with materials or mesh data. This makes them ideal for post-processing effects and non-mesh-based shaders, like screen-space effects. Unlike PostProcessingShaders, Global Shaders don’t need to tie into the post-processing pipeline, so they’re more flexible and can be added directly to the rendering sequence without modifying the source code.
+
+For a deeper dive into shader types in Unreal Engine, check out [blog post](https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html ).
 
 ### The game module
 
-For starters, we need to create a custom game module, separate from the primary one.  This is because shaders need to be compiled at a certain point, and by the time the primary game module is initialized – it is too late.
+To add Global Shaders in UE5, you need to create a custom game module separate from the primary one. This is because shaders need to be compiled at a certain point, and by the time the primary game module is initialized – it is too late. Here’s a step-by-step guide for setting up this custom module.
 
-Assuming you already have your C++ project set up, you can do this by  first going to ProjectName/Source, creating a new folder in that directory, and naming it as you’d name the new module. In this post, I will call it “AuraShaderModule”, as that is what I will be implementing.
+#### Step 1: Create the Module Folder Structure
 
-Next you create 3 more folders in the new one: Public, Private and Shaders. After this, some files need to be created.
+1. Go to ProjectName/Source.
+2. Create a new folder for the module (e.g., AuraShaderModule).
+3. Inside this folder, create three subfolders:
+    * Public: for header files
+    * Private: for implementation files
+    * Shaders: for shader files
+4. Create these files:
+    * *Root Module Folder*: `AuraShaderModule.build.cs`
+    * *Public*:
+        * `AuraShaderModule.h`
+        * `CustomViewExtension.h`
+        * `OutlineShader.h`
+    * *Private*:
+        * `AuraShaderModule.cpp`
+        * `CustomViewExtension.cpp`
+        * `OutlineShader.cpp`
 
-In the root module folder:
+#### Step 2: Define the Module Class
 
-* AuraShaderModule.build.cs
-
-In Public:
-
-* AuraShaderModule.h
-* CustomViewExtension.h
-* OutlineShader.h
-
-In Private:
-
-* AuraShaderModule.cpp
-* CustomViewExtension.cpp
-* OutlineShader.cpp
-
-Once that is done, we can start writing our module class.
+In AuraShaderModule.h, define the module class:
 
 ```c++
 //Public/AuraShaderModule.h
@@ -270,6 +280,8 @@ public:
 virtual void StartupModule() override;
 };
 ```
+
+In AuraShaderModule.cpp, implement StartupModule() to set up the shader directory:
 
 ```c++
 //Private/AuraShaderModule.cpp
@@ -284,7 +296,14 @@ AddShaderSourceDirectoryMapping(TEXT("/AuraShaderModule"), ModuleShaderDir);
 IMPLEMENT_MODULE(FAuraShaderModule, AuraShaderModule);
 ```
 
-Here we use `AddShaderSourceDirectoryMapping` again to add a shader directory to the Shader folder we created inside the module folder. Then we use the macro `IMPLEMENT_MODULE` to implement it, adding the name of the class and also the build file, which we will write next.
+Here:
+
+* `AddShaderSourceDirectoryMapping` adds a path to the module’s Shaders folder, so UE5 can find the shaders.
+* `IMPLEMENT_MODULE` registers the module with the engine.
+
+#### Step 3: Configure Build Rules
+
+In `AuraShaderModule.build.cs`, specify module dependencies and include paths:
 
 ```c++
 // AuraShaderModule.build.cs
@@ -306,7 +325,11 @@ public class AuraShaderModule : ModuleRules
 
 Here we define the public dependencies of the module as in previous examples. We also add `Source/Runtime/Renderer/Private` to the include paths, as we will be referencing some private classes.
 
+#### Step 4:  Add the Module to the Project
+
 Finally, we need to actually add the module to the project. For starters let's add our custom module to the `PublicDependencyModuleNames` of our primary module. This can be found under  `Source/ProjectName/AuraShaderModule.Build.cs`.
+
+1. Primary Module’s Build.cs: Add your custom module to the primary module’s dependencies by updating `ProjectName.Build.cs`:
 
 ```c#
 //AuraShaderModule.Build.cs
@@ -327,7 +350,7 @@ public Prototypes(ReadOnlyTargetRules Target) : base(Target)
 }
 ```
 
-Finally, we just have to add the module to the .uproject file. It is very important we set `LoadingPhase` as `PostConfigInit` so our shaders get compiled. So just open the .uproject file as a text file and make sure it looks something like this:
+2. UProject File: Open the `.uproject` file in a text editor and add `AuraShaderModule` with `LoadingPhase` set to `PostConfigInit`:
 
 ```c++
 "Modules": [
@@ -347,7 +370,8 @@ Finally, we just have to add the module to the .uproject file. It is very import
 ],
 ```
 
-Once this is all done, you can right click the .uproject file and click on `Generate Visual Studio Project Files`. At this point you can run Unreal through visual studio to make sure everything runs properly.
+Once this is all done, you can right click the .uproject file and click on `Generate Visual Studio Project Files`.
+With these steps completed, your custom game module is ready, and UE5 should recognize and compile shaders within it on launch.
 
 ### Defining and implementing a Global Shader
 
@@ -373,7 +397,6 @@ END_SHADER_PARAMETER_STRUCT()
 ```
 
 These Unreal macros might seem scary, but once you read into it you'll realize all it does is define a structure using macros.
-
 Next let's define the shader class.
 
 ```c++
@@ -728,7 +751,7 @@ Finally we are done setting this up. Now we can move to the very last step.
 
 ### Implementing the scene view extension
 
-This is the last and most simple step here. All we have to do to start up our render pass is call the SceneViewExtension constructor somewhere in our game. I personally like having it in a blueprint, on BeginPlay(). I recommend you do it as well, to avoid any annoying crashes caused by errors. 
+This is the last and most simple step here. All we have to do to start up our render pass is call the SceneViewExtension constructor somewhere in our game. I personally like having it in a blueprint, on BeginPlay(). I recommend you do it as well, to avoid any annoying crashes caused by errors.
 
 ```c++
 void ACustomPass::BeginPlay()
@@ -746,7 +769,9 @@ Now compile and press play!
 
 ## Conclusion
 
-Wile definitely not the only ones existing, these are the ways of using external shaders and HLSL I have found during my research. A lot of these are heavily based on other blog posts that I have found, so I will list them here.
+Through this guide, you should now have a foundational understanding of how to integrate custom shaders into Unreal Engine 5, extending its graphical capabilities with HLSL.
+
+The techniques in this guide were inspired by research and external resources on Unreal Engine's shader capabilities. The following references were especially helpful:
 
 1. [Unreal Engine Custom Node by 1000 Forms of Bunnies](https://viclw17.github.io/2022/02/01/unreal-engine-custom-node)
 2. [Global shaders in Unreal without engine modification by Caius](https://itscai.us/blog/post/ue-view-extensions/)

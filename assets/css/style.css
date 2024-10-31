@@ -239,9 +239,9 @@ Full-Width Styles
 #main_content_wrap { background: #212121; border-top: 1px solid #111; border-bottom: 1px solid #111; }
 
 #main_content { padding-top: 40px; }
-#main_content p { color:#cdcbcb; font-size:18px; text-align: justify ;}
-#main_content ul { color:#cdcbcb;font-size:18px;  }
-#main_content li { color:#cdcbcb;font-size:18px;  }
+#main_content p { color:#cdcbcb; font-size:16px; text-align: justify ;}
+#main_content ul { color:#cdcbcb;font-size:16px;  }
+#main_content li { color:#cdcbcb;font-size:16px;  }
 
 #footer_wrap { background: #212121; }
 
