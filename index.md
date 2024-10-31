@@ -223,9 +223,9 @@ Now to finally to use this shader, you plug everything in, you add the include p
 DetectEdges detect;
 return detect.DetectEdge(Uv, Color, LineThickness, ScreenSize, DepthBias, DepthPrecision, Noise, NoiseStrength, TendrilColor, DebugLines);
 ```
+
 This is the final result!
 ![alt text](assets/images/Aura.gif "Title")
-
 
 ## Global Shaders and SceneViewExtension
 
