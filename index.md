@@ -62,8 +62,6 @@ Once everything is plugged in and the parameters are set, this is the result we 
 ![alt text](Assets/images/CustomNodeBP.png "Title")
 ![alt text](Assets/images/Outlines.png "Title")
 
-//insert result image
-
 ## Using external shaders with the custom node
 
 If you have experience with the custom node already, you might have noticed that there is an input for include paths.
