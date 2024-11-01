@@ -46,13 +46,41 @@
     <!-- MAIN CONTENT -->
     <div id="main_content_wrap" class="outer" >
       <section id="main_content" class="inner">
-          
+          <!-- TOC -->
+<p><a name="introduction"></a></p>
 <h2 id="introduction">Introduction</h2>
 
 <p>While the material graph in UE5 is quite complete, sometimes using HLSL is a better alternative. For example, not only are for loops nowhere to be found in the material graph, it can also get tedious and messy very fast as the complexity of a shader increases.</p>
 
 <p>In this post, I will showcase some ways to create shaders using HLSL and explain their pros and cons. Rest assured, none of these will require you to tackle the tedious task of building UE5 from source.</p>
 
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+<h4 id="table-of-contents">Table Of Contents</h4>
+
+<ul>
+  <li><a href="#the-custom-node">The custom node</a></li>
+  <li><a href="#using-external-shaders-with-the-custom-node">Using external shaders with the custom node</a>
+    <ul>
+      <li><a href="#setup">Setup</a></li>
+      <li><a href="#using-it">Using it</a></li>
+    </ul>
+  </li>
+  <li><a href="#global-shaders-and-sceneviewextension">Global Shaders and SceneViewExtension</a>
+    <ul>
+      <li><a href="#why-use-sceneviewextensions-and-global-shaders">Why Use SceneViewExtensions and Global Shaders?</a></li>
+      <li><a href="#the-game-module">The game module</a></li>
+      <li><a href="#defining-and-implementing-a-global-shader">Defining and implementing a Global Shader</a></li>
+      <li><a href="#scene-view-extensions">Scene view extensions</a></li>
+      <li><a href="#implementing-the-scene-view-extension">Using the scene view extension</a></li>
+    </ul>
+  </li>
+  <li><a href="#conclusion">Conclusion</a></li>
+</ul>
+
+<!-- TOC end -->
+
+<!-- TOC -->
+<p><a name="the-custom-node"></a></p>
 <h2 id="the-custom-node">The custom node</h2>
 
 <p>The easiest and fastest way to create shaders with HLSL in UE5 is by using the custom node in the material graph.</p>
@@ -110,6 +138,8 @@
 
 <p><img src="assets/images/outlines.png" alt="alt text" title="Title" /></p>
 
+<!-- TOC -->
+<p><a name="using-external-shaders-with-the-custom-node"></a></p>
 <h2 id="using-external-shaders-with-the-custom-node">Using external shaders with the custom node</h2>
 
 <p>If you’re familiar with the custom node, you may have noticed an input for include paths:</p>
@@ -118,6 +148,8 @@
 
 <p>Include paths become useful when shader code grows in complexity, and you’d prefer to work in a text editor. UE5 does not expect external HLSL files, so using them requires a bit of setup.</p>
 
+<!-- TOC -->
+<p><a name="setup"></a></p>
 <h3 id="setup">Setup</h3>
 
 <p>The default shader path is in the engine folder, but if you’d like to keep your shaders under version control, we’ll set up an alternative path in the game module. This requires some C++ knowledge and Visual Studio.</p>
@@ -178,6 +210,8 @@
 
 <p>Once this is all done, you can press F5 to launch UE5.</p>
 
+<!-- TOC -->
+<p><a name="using-it"></a></p>
 <h3 id="using-it">Using it</h3>
 
 <p>To expand the previous shader, let’s say we want to apply a noise texture along the edges of the objects.</p>
@@ -270,6 +304,8 @@
 
 <p><img src="assets/images/Aura.gif" alt="alt text" title="Title" /></p>
 
+<!-- TOC -->
+<p><a name="global-shaders-and-sceneviewextension"></a></p>
 <h2 id="global-shaders-and-sceneviewextension">Global Shaders and SceneViewExtension</h2>
 
 <table>
@@ -282,6 +318,8 @@
 
 <p>While custom nodes work well for simpler shaders, more complex effects that require multiple rendering passes are best achieved using SceneViewExtensions and Global Shaders. Here’s an overview of what these two features do and how they enable advanced rendering effects in UE5.</p>
 
+<!-- TOC -->
+<p><a name="why-use-sceneviewextensions-and-global-shaders"></a></p>
 <h3 id="why-use-sceneviewextensions-and-global-shaders">Why Use SceneViewExtensions and Global Shaders?</h3>
 
 <p><em>SceneViewExtension</em> allows you to inject custom render passes without modifying the Unreal Engine source code. This means you can add custom post-processing steps and advanced effects to the UE5 rendering pipeline.</p>
@@ -290,10 +328,14 @@
 
 <p>For a deeper dive into shader types in Unreal Engine, check out <a href="https://logins.github.io/graphics/2021/03/31/UE4ShadersIntroduction.html">blog post</a>.</p>
 
+<!-- TOC -->
+<p><a name="the-game-module"></a></p>
 <h3 id="the-game-module">The game module</h3>
 
 <p>To add Global Shaders in UE5, you need to create a custom game module separate from the primary one. This is because shaders need to be compiled at a certain point, and by the time the primary game module is initialized – it is too late. Here’s a step-by-step guide for setting up this custom module.</p>
 
+<!-- TOC -->
+<p><a name="step-1-create-the-module-folder-structure"></a></p>
 <h4 id="step-1-create-the-module-folder-structure">Step 1: Create the Module Folder Structure</h4>
 
 <ol>
@@ -327,6 +369,8 @@
   </li>
 </ol>
 
+<!-- TOC -->
+<p><a name="step-2-define-the-module-class"></a></p>
 <h4 id="step-2-define-the-module-class">Step 2: Define the Module Class</h4>
 
 <p>In AuraShaderModule.h, define the module class:</p>
@@ -363,6 +407,8 @@
   <li><code class="language-plaintext highlighter-rouge">IMPLEMENT_MODULE</code> registers the module with the engine.</li>
 </ul>
 
+<!-- TOC -->
+<p><a name="step-3-configure-build-rules"></a></p>
 <h4 id="step-3-configure-build-rules">Step 3: Configure Build Rules</h4>
 
 <p>In <code class="language-plaintext highlighter-rouge">AuraShaderModule.build.cs</code>, specify module dependencies and include paths:</p>
@@ -386,6 +432,8 @@
 
 <p>Here we define the public dependencies of the module as in previous examples. We also add <code class="language-plaintext highlighter-rouge">Source/Runtime/Renderer/Private</code> to the include paths, as we will be referencing some private classes.</p>
 
+<!-- TOC -->
+<p><a name="step-4-add-the-module-to-the-project"></a></p>
 <h4 id="step-4--add-the-module-to-the-project">Step 4:  Add the Module to the Project</h4>
 
 <p>Finally, we need to actually add the module to the project. For starters let’s add our custom module to the <code class="language-plaintext highlighter-rouge">PublicDependencyModuleNames</code> of our primary module. This can be found under  <code class="language-plaintext highlighter-rouge">Source/ProjectName/AuraShaderModule.Build.cs</code>.</p>
@@ -436,6 +484,8 @@
 <p>Once this is all done, you can right click the .uproject file and click on <code class="language-plaintext highlighter-rouge">Generate Visual Studio Project Files</code>.
 With these steps completed, your custom game module is ready, and UE5 should recognize and compile shaders within it on launch.</p>
 
+<!-- TOC -->
+<p><a name="defining-and-implementing-a-global-shader"></a></p>
 <h3 id="defining-and-implementing-a-global-shader">Defining and implementing a Global Shader</h3>
 
 <p>Now let’s get to the fun part - defining a global shader. Let’s start with <code class="language-plaintext highlighter-rouge">AuraShaderModule/Private/OutlineShader.h</code> and define the input structure for our shaders. These are the same ones as we used in the custom node chapter.</p>
@@ -589,6 +639,8 @@ Next let’s define the shader class.</p>
 
 <p>Once you have all of this, launch UE5 from visual studio to make sure everything compiles.</p>
 
+<!-- TOC -->
+<p><a name="scene-view-extensions"></a></p>
 <h3 id="scene-view-extensions">Scene view extensions</h3>
 
 <p>As I mentioned, the <code class="language-plaintext highlighter-rouge">scene view extension</code> class is what’s responsible for injecting the render pass in the engine. If you look at this base class, you can see all the functions you can use for this</p>
@@ -808,7 +860,9 @@ Next, in the .cpp file is were we implement the logic, specifically in <code cla
 
 <p>Finally we are done setting this up. Now we can move to the very last step.</p>
 
-<h3 id="implementing-the-scene-view-extension">Implementing the scene view extension</h3>
+<!-- TOC -->
+<p><a name="implementing-the-scene-view-extension"></a></p>
+<h3 id="using-the-scene-view-extension">Using the scene view extension</h3>
 
 <p>This is the last and most simple step here. All we have to do to start up our render pass is call the SceneViewExtension constructor somewhere in our game. I personally like having it in a blueprint, on BeginPlay(). I recommend you do it as well, to avoid any annoying crashes caused by errors.</p>
 
@@ -826,6 +880,8 @@ Now compile and press play!</p>
 
 <p>(For extra effect I also added a very simple fog using the depth stencil ;) )</p>
 
+<!-- TOC -->
+<p><a name="conclusion"></a></p>
 <h2 id="conclusion">Conclusion</h2>
 
 <p>Through this guide, you should now have a foundational understanding of how to integrate custom shaders into Unreal Engine 5, extending its graphical capabilities with HLSL.</p>
