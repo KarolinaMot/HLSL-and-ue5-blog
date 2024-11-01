@@ -61,7 +61,7 @@ Once everything is connected, this is the result
 
 ![alt text](assets/images/CustomNodeBP.png "Title")
 
-![alt text](assets/images/Outlines.png "Title")
+![alt text](assets/images/outlines.png "Title")
 
 ## Using external shaders with the custom node
 
