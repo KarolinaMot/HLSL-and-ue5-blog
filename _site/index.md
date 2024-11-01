@@ -60,6 +60,7 @@ Next, set the return type of the node snippet to float in the node’s details.
 Once everything is connected, this is the result
 
 ![alt text](assets/images/CustomNodeBP.png "Title")
+
 ![alt text](assets/images/Outlines.png "Title")
 
 ## Using external shaders with the custom node
